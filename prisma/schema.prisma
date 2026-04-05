@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(uuid())
+  email      String      @unique
+  password   String
+  name       String
+  credits    Int         @default(10000)
+  createdAt  DateTime    @default(now())
+  characters Character[]
+  projects   Project[]
+}
+
+model Character {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  imageUrl  String
+  prompt    String   @default("")
+  style     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Project {
+  id                   String          @id @default(uuid())
+  userId               String
+  projectType          String          @default("story_video")
+  storyPrompt          String?
+  storyDuration        Int             @default(60)
+  storyNarrator        Boolean         @default(true)
+  storyNarratorVoice   String?
+  storyCharacters      Json            @default("[]")
+  storyScript          Json            @default("[]")
+  storyScenePrompts    Json            @default("[]")
+  storySceneImages     Json            @default("[]")
+  storyAudioUrls       Json            @default("[]")
+  aspectRatio          String          @default("16:9")
+  videoQuality         String          @default("quick")
+  generationStatus     String?
+  generationStartedAt  DateTime?
+  finalVideoUrl        String?
+  isCompleted          Boolean         @default(false)
+  currentStep          Int             @default(1)
+  createdAt            DateTime        @default(now())
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationLogs       GenerationLog[]
+
+  @@index([userId])
+}
+
+model GenerationLog {
+  id        String   @id @default(uuid())
+  projectId String
+  step      String
+  status    String
+  message   String?
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
