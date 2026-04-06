@@ -1,4 +1,7 @@
 export interface StoryCharacter {
+  /** Saved library character id when chosen from the picker (stable identity). */
+  id?: string;
+  /** Speaker name in script/audio; uniquified when the same library name is picked twice. */
   name: string;
   imageUrl: string;
   voiceId: string | null;
@@ -10,11 +13,21 @@ export interface StoryScene {
   character: string;
   audio: string;
   scene_description: string;
+  /** Library character id for cast lines; null/omit for Narrator. */
+  characterId?: string | null;
 }
 
 export interface Voice {
   id: string;
   previewUrl: string;
+}
+
+/** `GET /api/characters/styles` item — standalone-character-creator-porting-guide.md §3.1 */
+export interface CharacterStyle {
+  style_name: string;
+  model: string;
+  thumbnail_image: string;
+  prompt_enhancer: string | null;
 }
 
 export interface Character {

@@ -32,7 +32,17 @@ export async function POST(request: NextRequest) {
     const token = signToken({ userId: user.id, email: user.email });
 
     return Response.json({ token, user });
-  } catch {
-    return Response.json({ error: "Registration failed" }, { status: 500 });
+  } catch (err) {
+    console.error("[api/auth/register]", err);
+    const isDev = process.env.NODE_ENV === "development";
+    const prismaCode =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: string }).code)
+        : "";
+    const message =
+      isDev && err instanceof Error
+        ? `${err.message}${prismaCode ? ` (${prismaCode})` : ""}`
+        : "Registration failed";
+    return Response.json({ error: message }, { status: 500 });
   }
 }

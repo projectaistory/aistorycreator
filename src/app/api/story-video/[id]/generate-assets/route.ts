@@ -1,9 +1,25 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, requireAuth } from "@/lib/auth";
-import { getStoryVideoGenerationCredits, STORY_DEFAULT_NARRATOR_VOICE } from "@/lib/constants";
-import { generateStoryAudio, generateSceneImages, generateSceneImagesFromText } from "@/services/wavespeed";
+import {
+  getStoryVideoGenerationCredits,
+  normalizeStoryVideoAspectRatio,
+} from "@/lib/constants";
+import {
+  generateStoryAudio,
+  generateSceneImages,
+  generateSceneImagesFromText,
+} from "@/services/wavespeed";
 import type { StoryCharacter, StoryScene } from "@/types";
+import { pipelineTraceLine, summarizeMediaUrl } from "@/lib/pipelineTrace";
+import {
+  buildVoiceByCharacterId,
+  buildVoiceMap,
+  resolveCanonicalSpeaker,
+  resolveVoiceIdForScene,
+} from "@/lib/storyTtsVoices";
+
+const DEBUG_MSG_MAX = 4000;
 
 export async function POST(
   request: NextRequest,
@@ -52,7 +68,6 @@ export async function POST(
     data: { generationStatus: "generating", generationStartedAt: new Date() },
   });
 
-  // Return immediately, pipeline continues async
   const response = Response.json({
     status: "generating",
     projectId: id,
@@ -60,39 +75,95 @@ export async function POST(
     storyDuration: project.storyDuration,
   });
 
-  // Async pipeline
-  (async () => {
-    try {
-      const script = project.storyScript as unknown as StoryScene[];
-      const characters = project.storyCharacters as unknown as StoryCharacter[];
-      const voiceMap: Record<string, string> = {};
-      characters.forEach((c) => {
-        if (c.voiceId) voiceMap[c.name] = c.voiceId;
-      });
+  const userId = user!.id;
+  const projectSnapshot = project;
 
-      // Audio generation
+  after(async () => {
+    const assetsTrace = async (detail: string) => {
+      const line = pipelineTraceLine("generate-assets", detail);
+      console.log(line);
+      try {
+        await prisma.generationLog.create({
+          data: {
+            projectId: id,
+            step: "story_pipeline_debug",
+            status: "info",
+            message: line.slice(0, DEBUG_MSG_MAX),
+          },
+        });
+      } catch (logErr) {
+        console.error("[generate-assets] persist debug log failed", logErr);
+      }
+    };
+
+    try {
+      const storyAspect = normalizeStoryVideoAspectRatio(
+        projectSnapshot.aspectRatio
+      );
+      const script = projectSnapshot.storyScript as unknown as StoryScene[];
+      const characters =
+        projectSnapshot.storyCharacters as unknown as StoryCharacter[];
+      const voiceMap = buildVoiceMap(characters);
+      const voiceByCharacterId = buildVoiceByCharacterId(characters);
+      const names = characters.map((c) => c.name.trim());
+      const narratorOn = projectSnapshot.storyNarrator;
+
+      await assetsTrace(
+        `Pipeline begin project=${id} scenes=${script.length} aspect=${storyAspect} ref_image=${Boolean(characters.find((c) => c.imageUrl))}`
+      );
+
       await prisma.generationLog.create({
         data: { projectId: id, step: "story_audio", status: "started" },
       });
 
       const audioUrls: string[] = [];
-      for (const scene of script) {
-        let voiceId: string;
-        if (scene.character === "Narrator") {
-          voiceId = project.storyNarratorVoice || STORY_DEFAULT_NARRATOR_VOICE;
-        } else {
-          voiceId = voiceMap[scene.character] || STORY_DEFAULT_NARRATOR_VOICE;
+      for (let i = 0; i < script.length; i++) {
+        const scene = script[i];
+        const canonCharacter = resolveCanonicalSpeaker(
+          scene.character,
+          names,
+          narratorOn
+        );
+        const sceneForTts: StoryScene = {
+          ...scene,
+          character: canonCharacter,
+        };
+        const voiceId = resolveVoiceIdForScene(
+          sceneForTts,
+          voiceMap,
+          voiceByCharacterId,
+          projectSnapshot.storyNarratorVoice
+        );
+
+        await assetsTrace(
+          `TTS scene ${i + 1}/${script.length} speaker="${canonCharacter}" voice="${voiceId}" chars=${scene.audio?.length ?? 0}`
+        );
+
+        try {
+          const audioUrl = await generateStoryAudio(scene.audio, voiceId);
+          audioUrls.push(audioUrl);
+          await assetsTrace(
+            `TTS scene ${i + 1} OK → ${summarizeMediaUrl(audioUrl)}`
+          );
+        } catch (sceneErr) {
+          const detail =
+            sceneErr instanceof Error ? sceneErr.message : String(sceneErr);
+          throw new Error(
+            `TTS failed at scene ${i + 1}/${script.length} (speaker "${canonCharacter}", voice "${voiceId}"): ${detail}`
+          );
         }
 
-        const audioUrl = await generateStoryAudio(scene.audio, voiceId);
-        audioUrls.push(audioUrl);
+        if (i < script.length - 1) {
+          await new Promise((r) => setTimeout(r, 250));
+        }
       }
 
       await prisma.generationLog.create({
         data: { projectId: id, step: "story_audio", status: "completed" },
       });
 
-      // Image generation
+      await assetsTrace("Phase: scene images (Seedream sequential / edit-sequential)");
+
       await prisma.generationLog.create({
         data: { projectId: id, step: "story_images", status: "started" },
       });
@@ -102,21 +173,33 @@ export async function POST(
       let sceneImages: string[];
 
       if (refCharacter) {
+        await assetsTrace(
+          `Images WITH ref character image=${summarizeMediaUrl(refCharacter.imageUrl)} batch_descriptions=${descriptions.length}`
+        );
         sceneImages = await generateSceneImages(
           descriptions,
           refCharacter.imageUrl,
-          project.aspectRatio
+          storyAspect
         );
       } else {
+        await assetsTrace(
+          `Images TEXT-ONLY sequential descriptions=${descriptions.length}`
+        );
         sceneImages = await generateSceneImagesFromText(
           descriptions,
-          project.aspectRatio
+          storyAspect
         );
       }
+
+      await assetsTrace(
+        `Images OK count=${sceneImages.length} first=${sceneImages[0] ? summarizeMediaUrl(sceneImages[0]) : "none"}`
+      );
 
       await prisma.generationLog.create({
         data: { projectId: id, step: "story_images", status: "completed" },
       });
+
+      await assetsTrace("Pipeline SUCCESS — assets saved on project");
 
       await prisma.project.update({
         where: { id },
@@ -128,16 +211,48 @@ export async function POST(
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Asset generation failed";
+      const message =
+        err instanceof Error ? err.message : "Asset generation failed";
+      const stack = err instanceof Error ? err.stack : "";
+      console.error("[generate-assets] pipeline error:", err);
+
+      try {
+        const failLine = pipelineTraceLine(
+          "generate-assets",
+          `FAIL: ${message}${stack ? `\n${stack.slice(0, 1500)}` : ""}`
+        );
+        console.log(failLine);
+        await prisma.generationLog.create({
+          data: {
+            projectId: id,
+            step: "story_pipeline_debug",
+            status: "info",
+            message: failLine.slice(0, DEBUG_MSG_MAX),
+          },
+        });
+      } catch {
+        /* ignore */
+      }
+
       await prisma.generationLog.create({
-        data: { projectId: id, step: "story_assets_error", status: "failed", message },
+        data: {
+          projectId: id,
+          step: "story_assets_error",
+          status: "failed",
+          message,
+        },
       });
       await prisma.project.update({
         where: { id },
         data: { generationStatus: "failed" },
       });
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { credits: { increment: creditsRequired } },
+      });
     }
-  })();
+  });
 
   return response;
 }

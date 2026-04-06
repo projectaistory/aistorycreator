@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, requireAuth } from "@/lib/auth";
 import { generateSingleSceneImage } from "@/services/wavespeed";
+import { normalizeStoryVideoAspectRatio } from "@/lib/constants";
 import type { StoryCharacter } from "@/types";
 
 export async function POST(
@@ -35,10 +36,11 @@ export async function POST(
   const refCharacter = characters.find((c) => c.imageUrl);
 
   try {
+    const storyAspect = normalizeStoryVideoAspectRatio(project.aspectRatio);
     const newImage = await generateSingleSceneImage(
       prompt,
       refCharacter?.imageUrl || null,
-      project.aspectRatio
+      storyAspect
     );
 
     const sceneImages = project.storySceneImages as unknown as string[];

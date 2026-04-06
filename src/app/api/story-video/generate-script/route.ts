@@ -7,6 +7,7 @@ import {
   STORY_DURATION_MIN,
   STORY_DURATION_MAX,
   STORY_MAX_CHARACTERS,
+  normalizeStoryVideoAspectRatio,
 } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       Math.min(STORY_DURATION_MAX, rawDuration || 60)
     );
 
-    const aspectRatio = rawAspect === "16:9" ? "16:9" : "3:4";
+    const aspectRatio = normalizeStoryVideoAspectRatio(rawAspect);
     const trimmedChars = characters.slice(0, STORY_MAX_CHARACTERS);
 
     const script = await generateStoryScript(

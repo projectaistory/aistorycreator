@@ -28,7 +28,6 @@ import {
   Sparkles,
   Play,
   Pause,
-  RefreshCw,
   Film,
   Mic,
   ImageIcon,
@@ -45,7 +44,12 @@ import {
   STORY_DURATION_MAX,
   STORY_MAX_CHARACTERS,
   getStoryVideoGenerationCredits,
+  normalizeStoryVideoAspectRatio,
 } from "@/lib/constants";
+import {
+  isNarratorCharacter,
+  resolveCanonicalSpeaker,
+} from "@/lib/storyTtsVoices";
 import type { StoryCharacter, StoryScene, Voice, Project, GenerationLog } from "@/types";
 import Link from "next/link";
 
@@ -85,12 +89,20 @@ export default function CreateStoryPage() {
   });
   const voices = voicesData?.voices || [];
 
-  // Polling for project status
+  const allCharactersHaveVoice = characters.every((c) =>
+    Boolean(c.voiceId?.trim())
+  );
+
+  // Polling for project status — stop once we have the final video or it failed
   const { data: project, refetch: refetchProject } = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => apiRequest<Project>(`/api/projects/${projectId}`),
     enabled: !!projectId && step >= 3,
-    refetchInterval: step >= 3 && generationStarted ? 3000 : false,
+    refetchInterval: (query) => {
+      const p = query.state.data;
+      if (p?.finalVideoUrl || p?.generationStatus === "failed") return false;
+      return step >= 3 && generationStarted ? 3000 : false;
+    },
   });
 
   const { data: logsData } = useQuery({
@@ -98,7 +110,11 @@ export default function CreateStoryPage() {
     queryFn: () =>
       apiRequest<{ logs: GenerationLog[] }>(`/api/projects/${projectId}/logs`),
     enabled: !!projectId && step >= 3 && generationStarted,
-    refetchInterval: generationStarted ? 3000 : false,
+    refetchInterval: (query) => {
+      if (project?.finalVideoUrl || project?.generationStatus === "failed")
+        return false;
+      return generationStarted ? 3000 : false;
+    },
   });
 
   // Load project for edit mode
@@ -109,9 +125,29 @@ export default function CreateStoryPage() {
         setDuration(p.storyDuration);
         setNarrator(p.storyNarrator);
         setNarratorVoice(p.storyNarratorVoice || "Alex");
-        setAspectRatio(p.aspectRatio);
-        setCharacters(p.storyCharacters || []);
-        setScript((p.storyScript as StoryScene[]) || []);
+        setAspectRatio(normalizeStoryVideoAspectRatio(p.aspectRatio));
+        const loadedChars = p.storyCharacters || [];
+        setCharacters(loadedChars);
+        const rawScript = (p.storyScript as StoryScene[]) || [];
+        const castNames = loadedChars.map((c) => c.name.trim());
+        const normalized = rawScript.map((s) => {
+          const canon = resolveCanonicalSpeaker(
+            s.character,
+            castNames,
+            p.storyNarrator
+          );
+          const match =
+            canon !== "Narrator"
+              ? loadedChars.find((c) => c.name.trim() === canon)
+              : null;
+          return {
+            ...s,
+            character: canon,
+            characterId:
+              canon === "Narrator" ? null : match?.id ?? s.characterId ?? null,
+          };
+        });
+        setScript(normalized);
         setStep(p.currentStep || 2);
       });
     }
@@ -160,14 +196,40 @@ export default function CreateStoryPage() {
     },
   });
 
+  const normalizeScriptSpeakers = useCallback(
+    (scenes: StoryScene[]): StoryScene[] => {
+      const castNames = characters.map((c) => c.name.trim());
+      return scenes.map((s) => {
+        const canon = resolveCanonicalSpeaker(s.character, castNames, narrator);
+        const ch =
+          canon !== "Narrator"
+            ? characters.find((c) => c.name.trim() === canon)
+            : null;
+        return {
+          ...s,
+          character: canon,
+          characterId:
+            canon === "Narrator" ? null : ch?.id ?? s.characterId ?? null,
+        };
+      });
+    },
+    [characters, narrator]
+  );
+
   // Step 2: Update script
   const updateScriptMutation = useMutation({
-    mutationFn: () =>
-      apiRequest(`/api/story-video/${projectId}/update-script`, {
+    mutationFn: async () => {
+      const normalized = normalizeScriptSpeakers(script);
+      await apiRequest(`/api/story-video/${projectId}/update-script`, {
         method: "POST",
-        body: JSON.stringify({ script }),
-      }),
-    onSuccess: () => toast.success("Script saved"),
+        body: JSON.stringify({ script: normalized }),
+      });
+      return normalized;
+    },
+    onSuccess: (normalized) => {
+      setScript(normalized);
+      toast.success("Script saved");
+    },
     onError: () => toast.error("Failed to save script"),
   });
 
@@ -207,19 +269,6 @@ export default function CreateStoryPage() {
     },
   });
 
-  // Regenerate scene
-  const regenerateSceneMutation = useMutation({
-    mutationFn: (sceneIndex: number) =>
-      apiRequest<{ imageUrl: string }>(
-        `/api/story-video/${projectId}/regenerate-scene/${sceneIndex}`,
-        { method: "POST" }
-      ),
-    onSuccess: () => {
-      refetchProject();
-      toast.success("Scene regenerated!");
-    },
-    onError: () => toast.error("Failed to regenerate scene"),
-  });
 
   const previewVoice = useCallback((voiceId: string, previewUrl: string) => {
     if (playingVoice === voiceId) {
@@ -237,17 +286,45 @@ export default function CreateStoryPage() {
 
   // Progress computation from logs
   const logs = logsData?.logs || [];
+  const assetFailureLog = logs.find(
+    (l) => l.step === "story_assets_error" && l.status === "failed"
+  );
+  const videoFailureLog = logs.find(
+    (l) => l.step === "story_video_error" && l.status === "failed"
+  );
+  const generationFailureDetail =
+    assetFailureLog?.message || videoFailureLog?.message || null;
+  const sceneImagesForRetry = (project?.storySceneImages as string[]) || [];
+  const audioUrlsForRetry = (project?.storyAudioUrls as string[]) || [];
+  const assetsReadyForVideo =
+    sceneImagesForRetry.length > 0 && audioUrlsForRetry.some((u) => u);
+  const canRetryAssetsAfterFailure =
+    project?.generationStatus === "failed" && Boolean(assetFailureLog);
+  const canRetryVideoAfterFailure =
+    project?.generationStatus === "failed" &&
+    Boolean(videoFailureLog) &&
+    assetsReadyForVideo;
+
+  /** Ordered server debug lines (TTS, images, ffmpeg merge attempts). */
+  const pipelineDebugLogs = logs.filter((l) => l.step === "story_pipeline_debug");
+
   const progressSteps = [
     { key: "story_audio", label: "Generating voices" },
     { key: "story_images", label: "Creating scene images" },
-    { key: "story_video_start", label: "Starting video" },
+    { key: "story_video_start", label: "Starting video generation" },
     { key: "story_video_segments", label: "Creating video segments" },
-    { key: "story_video_complete", label: "Finalizing" },
+    { key: "story_video_merge", label: "Merging final video" },
+    { key: "story_video_captions", label: "Adding captions" },
+    { key: "story_video_complete", label: "Complete" },
   ];
 
   function getProgress() {
     const completed = progressSteps.filter((s) =>
-      logs.some((l) => l.step === s.key && l.status === "completed")
+      logs.some(
+        (l) =>
+          l.step === s.key &&
+          (l.status === "completed" || l.status === "warning")
+      )
     ).length;
     return Math.round((completed / progressSteps.length) * 100);
   }
@@ -344,7 +421,7 @@ export default function CreateStoryPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
-                      <SelectItem value="3:4">3:4 (Portrait)</SelectItem>
+                      <SelectItem value="9:16">9:16 (Portrait)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -425,9 +502,14 @@ export default function CreateStoryPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {!allCharactersHaveVoice && (
+                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                      Choose a voice for each character before generating the script.
+                    </p>
+                  )}
                   {characters.map((char, i) => (
                     <div
-                      key={char.name}
+                      key={char.id ?? `${char.name}-${i}`}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
@@ -493,6 +575,7 @@ export default function CreateStoryPage() {
               disabled={
                 !storyPrompt ||
                 characters.length === 0 ||
+                !allCharactersHaveVoice ||
                 generateScriptMutation.isPending
               }
               className="gap-2"
@@ -532,24 +615,81 @@ export default function CreateStoryPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {script.map((scene, i) => (
+              {script.map((scene, i) => {
+                const castNames = characters.map((c) => c.name.trim());
+                const effectiveSpeaker = resolveCanonicalSpeaker(
+                  scene.character,
+                  castNames,
+                  narrator
+                );
+                const unknownSpeaker =
+                  effectiveSpeaker !== "Narrator" &&
+                  !castNames.includes(effectiveSpeaker);
+                return (
                 <div
                   key={scene.id}
                   className="p-4 rounded-lg bg-muted/30 border border-border/50 space-y-3"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <Badge variant="secondary" className="text-xs shrink-0">
                         Scene {scene.id}
                       </Badge>
-                      <Badge
-                        variant={
-                          scene.character === "Narrator" ? "outline" : "default"
-                        }
-                        className="text-xs"
-                      >
-                        {scene.character}
-                      </Badge>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Label className="text-xs text-muted-foreground shrink-0">
+                          Speaker
+                        </Label>
+                        <Select
+                          value={effectiveSpeaker}
+                          onValueChange={(raw) => {
+                            if (raw == null) return;
+                            const value = raw;
+                            const updated = [...script];
+                            if (value === "Narrator") {
+                              updated[i] = {
+                                ...scene,
+                                character: "Narrator",
+                                characterId: null,
+                              };
+                            } else {
+                              const ch = characters.find(
+                                (c) => c.name.trim() === value
+                              );
+                              updated[i] = {
+                                ...scene,
+                                character: value,
+                                characterId: ch?.id ?? null,
+                              };
+                            }
+                            setScript(updated);
+                          }}
+                        >
+                          <SelectTrigger
+                            className={`h-8 text-xs max-w-[220px] ${
+                              isNarratorCharacter(effectiveSpeaker)
+                                ? "border-dashed"
+                                : ""
+                            }`}
+                          >
+                            <SelectValue placeholder="Speaker" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {narrator && (
+                              <SelectItem value="Narrator">Narrator</SelectItem>
+                            )}
+                            {characters.map((c) => (
+                              <SelectItem key={c.id ?? c.name} value={c.name.trim()}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                            {unknownSpeaker && (
+                              <SelectItem value={effectiveSpeaker}>
+                                {effectiveSpeaker} (unmatched)
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -606,7 +746,8 @@ export default function CreateStoryPage() {
                     </>
                   )}
                 </div>
-              ))}
+              );
+              })}
             </CardContent>
           </Card>
 
@@ -625,17 +766,27 @@ export default function CreateStoryPage() {
                 Save Changes
               </Button>
               <Button
-                onClick={() => {
-                  updateScriptMutation.mutate();
-                  generateAssetsMutation.mutate();
+                onClick={async () => {
+                  try {
+                    await updateScriptMutation.mutateAsync();
+                    await generateAssetsMutation.mutateAsync();
+                  } catch {
+                    /* toasts from mutation hooks */
+                  }
                 }}
-                disabled={generateAssetsMutation.isPending}
+                disabled={
+                  updateScriptMutation.isPending ||
+                  generateAssetsMutation.isPending
+                }
                 className="gap-2"
               >
-                {generateAssetsMutation.isPending ? (
+                {updateScriptMutation.isPending ||
+                generateAssetsMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Starting...
+                    {updateScriptMutation.isPending
+                      ? "Saving..."
+                      : "Starting..."}
                   </>
                 ) : (
                   <>
@@ -707,7 +858,8 @@ export default function CreateStoryPage() {
                 <div className="space-y-2">
                   {progressSteps.map((ps) => {
                     const log = logs.find((l) => l.step === ps.key);
-                    const isComplete = log?.status === "completed";
+                    const isComplete =
+                      log?.status === "completed" || log?.status === "warning";
                     const isActive = log?.status === "started";
                     return (
                       <div
@@ -738,62 +890,70 @@ export default function CreateStoryPage() {
                 </div>
 
                 {project?.generationStatus === "failed" && (
-                  <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-                    Generation failed. Please try again.
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="ml-4"
-                      onClick={() => generateAssetsMutation.mutate()}
-                    >
-                      Retry
-                    </Button>
+                  <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-sm space-y-3">
+                    <p className="font-medium text-destructive">
+                      Generation failed. Please try again.
+                    </p>
+                    {generationFailureDetail && (
+                      <pre className="text-xs text-destructive/90 whitespace-pre-wrap break-words font-mono bg-destructive/5 rounded-md p-3 border border-destructive/10 max-h-40 overflow-y-auto">
+                        {generationFailureDetail}
+                      </pre>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {canRetryAssetsAfterFailure && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => generateAssetsMutation.mutate()}
+                        >
+                          Retry assets
+                        </Button>
+                      )}
+                      {canRetryVideoAfterFailure && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            videoTriggeredRef.current = false;
+                            generateVideoMutation.mutate();
+                          }}
+                          disabled={generateVideoMutation.isPending}
+                        >
+                          Retry video
+                        </Button>
+                      )}
+                      {!canRetryAssetsAfterFailure &&
+                        !canRetryVideoAfterFailure && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => generateAssetsMutation.mutate()}
+                          >
+                            Retry
+                          </Button>
+                        )}
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
           )}
 
-          {/* Scene images preview */}
-          {(project?.storySceneImages as string[])?.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Scene Images</CardTitle>
+          {step === 3 && pipelineDebugLogs.length > 0 && (
+            <Card className="border-border/60">
+              <CardHeader className="py-3">
+                <CardTitle className="text-base font-medium">
+                  Execution trace
+                </CardTitle>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Server log for this run: WaveSpeed, ffmpeg POST attempts, merge
+                  rounds, and errors. Refreshes while the project is generating.
+                </p>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                  {(project!.storySceneImages as string[]).map(
-                    (img: string, i: number) => (
-                      <div key={i} className="relative group">
-                        <div className="aspect-video rounded-lg overflow-hidden bg-muted">
-                          <img
-                            src={img}
-                            alt={`Scene ${i + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => regenerateSceneMutation.mutate(i)}
-                            disabled={regenerateSceneMutation.isPending}
-                          >
-                            <RefreshCw className="w-3 h-3" />
-                            Regen
-                          </Button>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="absolute top-1 left-1 text-xs"
-                        >
-                          {i + 1}
-                        </Badge>
-                      </div>
-                    )
-                  )}
-                </div>
+              <CardContent className="pt-0">
+                <pre className="text-[11px] font-mono whitespace-pre-wrap break-all bg-muted/40 rounded-lg p-3 max-h-96 overflow-y-auto border border-border/40">
+                  {pipelineDebugLogs.map((l) => l.message ?? "").join("\n")}
+                </pre>
               </CardContent>
             </Card>
           )}

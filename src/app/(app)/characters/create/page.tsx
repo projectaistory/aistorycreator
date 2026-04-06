@@ -1,49 +1,60 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Save, Loader2, ArrowLeft, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import type { CharacterStyle } from "@/types";
 
-const STYLES = [
-  { value: "realistic", label: "Realistic" },
-  { value: "anime", label: "Anime" },
-  { value: "3d-render", label: "3D Render" },
-  { value: "cartoon", label: "Cartoon" },
-  { value: "fantasy", label: "Fantasy Art" },
-  { value: "watercolor", label: "Watercolor" },
-  { value: "pixel-art", label: "Pixel Art" },
-  { value: "cinematic", label: "Cinematic" },
-];
+const THUMB_FALLBACK =
+  "https://via.placeholder.com/150?text=No+Image";
 
 export default function CreateCharacterPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [style, setStyle] = useState("realistic");
+  const [selectedStyle, setSelectedStyle] = useState<CharacterStyle | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
 
+  const { data: stylesRes, isLoading: stylesLoading } = useQuery({
+    queryKey: ["character-styles"],
+    queryFn: () =>
+      apiRequest<{ styles: CharacterStyle[] }>("/api/characters/styles"),
+  });
+
+  const styles = stylesRes?.styles ?? [];
+
+  useEffect(() => {
+    if (styles.length && !selectedStyle) {
+      const noStyle = styles.find((s) => s.style_name === "No style");
+      setSelectedStyle(noStyle ?? styles[0] ?? null);
+    }
+  }, [styles, selectedStyle]);
+
   const generateMutation = useMutation({
-    mutationFn: () =>
-      apiRequest<{ imageUrl: string }>("/api/characters/generate-image", {
+    mutationFn: () => {
+      if (!selectedStyle) throw new Error("Select a style");
+      return apiRequest<{ imageUrl: string }>("/api/characters/generate-image", {
         method: "POST",
-        body: JSON.stringify({ prompt, style }),
-      }),
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          style: selectedStyle.style_name,
+          model: selectedStyle.model,
+          promptEnhancer: selectedStyle.prompt_enhancer,
+          aspectRatio: "3:4",
+        }),
+      });
+    },
     onSuccess: (data) => {
       setGeneratedImage(data.imageUrl);
       toast.success("Character image generated!");
@@ -61,7 +72,7 @@ export default function CreateCharacterPage() {
           name,
           imageUrl: generatedImage,
           prompt,
-          style,
+          style: selectedStyle?.style_name ?? null,
         }),
       }),
     onSuccess: () => {
@@ -72,6 +83,9 @@ export default function CreateCharacterPage() {
       toast.error((err as Record<string, string>)?.error || "Save failed");
     },
   });
+
+  const canGenerate =
+    prompt.trim().length > 10 && !!selectedStyle && !generateMutation.isPending;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -108,26 +122,54 @@ export default function CreateCharacterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="style">Art Style</Label>
-              <Select value={style} onValueChange={(v) => v && setStyle(v)}>
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STYLES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Art style</Label>
+              <p className="text-xs text-muted-foreground">
+                Thumbnails from NeonVideo CDN (see porting guide §4).
+              </p>
+              {stylesLoading ? (
+                <div className="h-40 rounded-lg bg-muted animate-pulse" />
+              ) : (
+                <ScrollArea className="h-[220px] rounded-lg border border-border/50 p-2">
+                  <div className="grid grid-cols-3 gap-2 pr-3">
+                    {styles.map((s) => (
+                      <button
+                        key={s.style_name}
+                        type="button"
+                        onClick={() => setSelectedStyle(s)}
+                        className={cn(
+                          "rounded-lg border-2 overflow-hidden text-left transition-colors",
+                          selectedStyle?.style_name === s.style_name
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-transparent hover:border-border"
+                        )}
+                      >
+                        <div className="aspect-square bg-muted relative">
+                          <img
+                            src={s.thumbnail_image}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              const el = e.currentTarget;
+                              if (el.src !== THUMB_FALLBACK) el.src = THUMB_FALLBACK;
+                            }}
+                          />
+                        </div>
+                        <p className="text-[10px] leading-tight p-1.5 line-clamp-2">
+                          {s.style_name}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="prompt">Description</Label>
               <Textarea
                 id="prompt"
-                placeholder="Describe your character's appearance in detail. e.g. 'A young woman with silver hair and violet eyes, wearing a dark leather jacket, determined expression'"
+                placeholder="Describe your character's appearance in detail (more than 10 characters)."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={5}
@@ -137,7 +179,7 @@ export default function CreateCharacterPage() {
 
             <Button
               onClick={() => generateMutation.mutate()}
-              disabled={!prompt || generateMutation.isPending}
+              disabled={!canGenerate}
               className="w-full gap-2"
             >
               {generateMutation.isPending ? (

@@ -7,9 +7,7 @@ import { useAuth } from "@/lib/use-auth";
 import {
   LayoutDashboard,
   Users,
-  UserPlus,
   Film,
-  PlusCircle,
   LogOut,
   Coins,
   BookOpen,
@@ -21,9 +19,7 @@ import { Separator } from "@/components/ui/separator";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/characters", label: "Characters", icon: Users },
-  { href: "/characters/create", label: "Create Character", icon: UserPlus },
   { href: "/stories", label: "My Stories", icon: Film },
-  { href: "/stories/create", label: "Create Story", icon: PlusCircle },
 ];
 
 export function Sidebar() {

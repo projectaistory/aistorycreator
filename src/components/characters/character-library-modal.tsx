@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Check, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { nextUniqueStoryCharacterName } from "@/lib/storyCharacterNames";
 import type { Character, StoryCharacter } from "@/types";
 
 interface Props {
@@ -36,16 +37,19 @@ export function CharacterLibraryModal({
   });
 
   const characters = data?.characters || [];
-  const selectedNames = new Set(selected.map((s) => s.name));
+  const selectedIds = new Set(
+    selected.map((s) => s.id).filter((id): id is string => Boolean(id))
+  );
 
   function toggleCharacter(char: Character) {
-    if (selectedNames.has(char.name)) {
-      onSelect(selected.filter((s) => s.name !== char.name));
+    if (selectedIds.has(char.id)) {
+      onSelect(selected.filter((s) => s.id !== char.id));
     } else if (selected.length < maxCharacters) {
       onSelect([
         ...selected,
         {
-          name: char.name,
+          id: char.id,
+          name: nextUniqueStoryCharacterName(char.name, selected),
           imageUrl: char.imageUrl,
           voiceId: null,
           prompt: char.prompt,
@@ -79,7 +83,7 @@ export function CharacterLibraryModal({
           ) : (
             <div className="grid gap-3 grid-cols-3 p-1">
               {characters.map((char) => {
-                const isSelected = selectedNames.has(char.name);
+                const isSelected = selectedIds.has(char.id);
                 const disabled = !isSelected && selected.length >= maxCharacters;
                 return (
                   <button
