@@ -108,8 +108,9 @@ export async function POST(
       const names = characters.map((c) => c.name.trim());
       const narratorOn = projectSnapshot.storyNarrator;
 
+      const charImageCount = characters.filter((c) => c.imageUrl).length;
       await assetsTrace(
-        `Pipeline begin project=${id} scenes=${script.length} aspect=${storyAspect} ref_image=${Boolean(characters.find((c) => c.imageUrl))}`
+        `Pipeline begin project=${id} scenes=${script.length} aspect=${storyAspect} ref_images=${charImageCount}`
       );
 
       await prisma.generationLog.create({
@@ -169,16 +170,18 @@ export async function POST(
       });
 
       const descriptions = script.map((s) => s.scene_description);
-      const refCharacter = characters.find((c) => c.imageUrl);
+      const refImageUrls = characters
+        .filter((c) => c.imageUrl)
+        .map((c) => c.imageUrl);
       let sceneImages: string[];
 
-      if (refCharacter) {
+      if (refImageUrls.length > 0) {
         await assetsTrace(
-          `Images WITH ref character image=${summarizeMediaUrl(refCharacter.imageUrl)} batch_descriptions=${descriptions.length}`
+          `Images WITH ${refImageUrls.length} ref character image(s)=${refImageUrls.map(summarizeMediaUrl).join(", ")} batch_descriptions=${descriptions.length}`
         );
         sceneImages = await generateSceneImages(
           descriptions,
-          refCharacter.imageUrl,
+          refImageUrls,
           storyAspect
         );
       } else {

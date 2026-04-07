@@ -5,6 +5,7 @@ import {
   findStyleByName,
 } from "@/lib/characterStyles";
 import { generateCharacterPortraitWithModel } from "@/services/wavespeed";
+import { ensureUrlOnBunnyStorage } from "@/services/bunnyStorage";
 
 const ASPECT_RATIOS = new Set(["1:1", "16:9", "9:16", "4:3", "3:4"]);
 
@@ -72,11 +73,19 @@ export async function POST(request: NextRequest) {
     rawAspect && ASPECT_RATIOS.has(rawAspect) ? rawAspect : "3:4";
 
   try {
-    const imageUrl = await generateCharacterPortraitWithModel({
+    const generatedImageUrl = await generateCharacterPortraitWithModel({
       userPrompt: trimmed,
       model,
       aspectRatio,
       promptEnhancer: promptEnhancer ?? null,
+    });
+    const imageUrl = await ensureUrlOnBunnyStorage(generatedImageUrl, {
+      folderEnvVar: "BUNNY_STORAGE_CHARACTERS_PATH",
+      defaultFolder: "characters",
+      preferredExt: "jpg",
+      contentType: "image/jpeg",
+      label: "character-image",
+      maxBytes: 40 * 1024 * 1024,
     });
     return Response.json({ imageUrl, prompt: trimmed });
   } catch (err) {

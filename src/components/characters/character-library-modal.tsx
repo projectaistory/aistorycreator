@@ -14,6 +14,7 @@ import { Check, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { nextUniqueStoryCharacterName } from "@/lib/storyCharacterNames";
 import type { Character, StoryCharacter } from "@/types";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
@@ -55,6 +56,8 @@ export function CharacterLibraryModal({
           prompt: char.prompt,
         },
       ]);
+    } else {
+      toast.warning(`You can select up to ${maxCharacters} characters.`);
     }
   }
 

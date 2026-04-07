@@ -11,6 +11,7 @@ import {
   LogOut,
   Coins,
   BookOpen,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,12 @@ const navItems = [
   { href: "/characters", label: "Characters", icon: Users },
   { href: "/stories", label: "My Stories", icon: Film },
 ];
+
+const adminNavItem = {
+  href: "/admin",
+  label: "Admin",
+  icon: Shield,
+} as const;
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -63,6 +70,20 @@ export function Sidebar() {
             </Link>
           );
         })}
+        {user?.role === "ADMIN" && (
+          <Link
+            href={adminNavItem.href}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border border-dashed border-primary/25",
+              pathname.startsWith("/admin")
+                ? "bg-violet-500/15 text-violet-600 dark:text-violet-400"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+            )}
+          >
+            <adminNavItem.icon className="w-4.5 h-4.5" />
+            {adminNavItem.label}
+          </Link>
+        )}
       </nav>
 
       <div className="p-4 space-y-3">

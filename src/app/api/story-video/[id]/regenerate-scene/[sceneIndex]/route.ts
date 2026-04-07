@@ -33,13 +33,15 @@ export async function POST(
   const prompt = (body as Record<string, string>).prompt || scenePrompts[sceneIndex];
 
   const characters = project.storyCharacters as unknown as StoryCharacter[];
-  const refCharacter = characters.find((c) => c.imageUrl);
+  const refImageUrls = characters
+    .filter((c) => c.imageUrl)
+    .map((c) => c.imageUrl);
 
   try {
     const storyAspect = normalizeStoryVideoAspectRatio(project.aspectRatio);
     const newImage = await generateSingleSceneImage(
       prompt,
-      refCharacter?.imageUrl || null,
+      refImageUrls.length > 0 ? refImageUrls : null,
       storyAspect
     );
 

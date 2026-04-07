@@ -1,24 +1,17 @@
-"use client";
+import { prisma } from "@/lib/prisma";
+import { serializePlan } from "@/lib/admin-serialize";
+import { HomePage } from "@/components/homepage/home-page";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getToken } from "@/lib/api-client";
+export default async function Page() {
+  let plans: ReturnType<typeof serializePlan>[] = [];
+  try {
+    const dbPlans = await prisma.plan.findMany({
+      orderBy: { monthlyPrice: "asc" },
+    });
+    plans = dbPlans.map(serializePlan);
+  } catch {
+    plans = [];
+  }
 
-export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const token = getToken();
-    if (token) {
-      router.replace("/dashboard");
-    } else {
-      router.replace("/login");
-    }
-  }, [router]);
-
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
-    </div>
-  );
+  return <HomePage plans={plans} />;
 }

@@ -102,6 +102,24 @@
     backdrop-filter: blur(12px);
     border: 1px solid oklch(0.25 0.03 280 / 0.5);
   }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.25 0.02 280) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: oklch(0.25 0.02 280);
+    border-radius: 3px;
+  }
 }
 
 ::-webkit-scrollbar {

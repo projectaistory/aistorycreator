@@ -13,6 +13,7 @@ import {
   normalizeSegmentUrlsForNeonvideoMerge,
   mirrorFfmpegDownloadUrlIfNeeded,
 } from "@/services/segmentMirror";
+import { ensureUrlOnBunnyStorage } from "@/services/bunnyStorage";
 import { nanoid } from "nanoid";
 import type { StoryScene } from "@/types";
 import { isNarratorCharacter } from "@/lib/storyTtsVoices";
@@ -263,6 +264,22 @@ export async function POST(
           },
         });
       }
+
+      await prisma.generationLog.create({
+        data: { projectId: id, step: "story_video_upload", status: "started" },
+      });
+      finalUrl = await ensureUrlOnBunnyStorage(finalUrl, {
+        folderEnvVar: "BUNNY_STORAGE_FINAL_PATH",
+        defaultFolder: "FinalVideos",
+        preferredExt: "mp4",
+        contentType: "video/mp4",
+        label: "final-video",
+        trace: videoTrace,
+        maxBytes: 600 * 1024 * 1024,
+      });
+      await prisma.generationLog.create({
+        data: { projectId: id, step: "story_video_upload", status: "completed" },
+      });
 
       // §5.5.7 — completion
       await videoTrace("Pipeline SUCCESS");

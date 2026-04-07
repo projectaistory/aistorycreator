@@ -41,9 +41,19 @@ WAVESPEED_API_KEY="your-wavespeed-key"
 # Create the database first (if needed)
 createdb ai_story_creator
 
-# Run Prisma migration
-npx prisma migrate dev --name init
+# Run Prisma migrations (applies all migrations in prisma/migrations)
+npx prisma migrate dev
+
+# Optional: seed plans, site settings, and bootstrap admin user
+npm run db:seed
 ```
+
+After seeding, an **admin** account is available (change the password in production):
+
+- **Email:** `admin@local.dev`
+- **Password:** `admin123`
+
+Open **Admin** from the sidebar (visible only to admins) or go to `/admin` to manage users, plans (Free / Basic / Pro samples), and site settings.
 
 4. **Start the development server:**
 
@@ -79,6 +89,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `POST /api/story-video/:id/generate-video` | Yes | Start video generation |
 | `GET /api/projects/:id` | Yes | Get project status |
 | `GET /api/projects/:id/logs` | Yes | Get generation logs |
+| `GET /api/admin/overview` | Admin | Dashboard stats + recent users |
+| `GET/PATCH /api/admin/users`, `PATCH /api/admin/users/:id` | Admin | List / update users |
+| `GET/POST /api/admin/plans`, `PATCH/DELETE /api/admin/plans/:id` | Admin | Manage subscription plans |
+| `GET/PATCH /api/admin/settings` | Admin | Site key/value settings |
 
 ## Credits System
 

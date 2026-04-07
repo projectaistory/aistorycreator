@@ -276,9 +276,12 @@ function seedreamSequentialSceneSize(aspectRatio: string): string {
 
 export async function generateSceneImages(
   descriptions: string[],
-  referenceImageUrl: string,
+  referenceImageUrls: string | string[],
   aspectRatio: string
 ): Promise<string[]> {
+  const urls = Array.isArray(referenceImageUrls)
+    ? referenceImageUrls
+    : [referenceImageUrls];
   const size = seedreamSequentialSceneSize(aspectRatio);
   const allImages: string[] = [];
   const batchSize = 12;
@@ -292,7 +295,7 @@ export async function generateSceneImages(
     const data = await wavespeedPost(
       "/bytedance/seedream-v4.5/edit-sequential",
       {
-        images: [referenceImageUrl],
+        images: urls.slice(0, 10),
         max_images: batch.length,
         prompt,
         size,
@@ -347,13 +350,13 @@ export async function generateSceneImagesFromText(
 
 export async function generateSingleSceneImage(
   description: string,
-  referenceImageUrl: string | null,
+  referenceImageUrls: string | string[] | null,
   aspectRatio: string
 ): Promise<string> {
-  if (referenceImageUrl) {
+  if (referenceImageUrls) {
     const images = await generateSceneImages(
       [description],
-      referenceImageUrl,
+      referenceImageUrls,
       aspectRatio
     );
     return images[0] || "";

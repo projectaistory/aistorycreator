@@ -36,6 +36,14 @@ export async function POST(request: NextRequest) {
     );
 
     const aspectRatio = normalizeStoryVideoAspectRatio(rawAspect);
+    if (characters.length > STORY_MAX_CHARACTERS) {
+      return Response.json(
+        {
+          error: `A maximum of ${STORY_MAX_CHARACTERS} characters can be selected`,
+        },
+        { status: 400 }
+      );
+    }
     const trimmedChars = characters.slice(0, STORY_MAX_CHARACTERS);
 
     const script = await generateStoryScript(

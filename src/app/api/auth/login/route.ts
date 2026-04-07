@@ -14,7 +14,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        name: true,
+        credits: true,
+        role: true,
+        planId: true,
+        createdAt: true,
+        plan: { select: { id: true, name: true, slug: true } },
+      },
+    });
     if (!user) {
       return Response.json({ error: "Invalid credentials" }, { status: 401 });
     }
@@ -24,17 +37,18 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const token = signToken({ userId: user.id, email: user.email });
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    const { password: _password, ...safeUser } = user;
+    void _password;
 
     return Response.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        credits: user.credits,
-        createdAt: user.createdAt,
-      },
+      user: safeUser,
     });
   } catch {
     return Response.json({ error: "Login failed" }, { status: 500 });

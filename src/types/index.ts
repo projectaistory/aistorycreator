@@ -72,11 +72,22 @@ export interface GenerationLog {
   createdAt: string;
 }
 
+export type UserRole = "USER" | "ADMIN";
+
+export interface UserPlanSummary {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   credits: number;
+  role: UserRole;
+  planId: string | null;
+  plan: UserPlanSummary | null;
   createdAt: string;
 }
 

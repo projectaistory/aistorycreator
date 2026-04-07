@@ -57,6 +57,7 @@ export default function CreateStoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+  const showExecutionTrace = searchParams.get("DEBUG") === "1";
 
   // Step tracking
   const [step, setStep] = useState(1);
@@ -93,6 +94,11 @@ export default function CreateStoryPage() {
     Boolean(c.voiceId?.trim())
   );
 
+  const clampCharacters = useCallback(
+    (next: StoryCharacter[]) => next.slice(0, STORY_MAX_CHARACTERS),
+    []
+  );
+
   // Polling for project status — stop once we have the final video or it failed
   const { data: project, refetch: refetchProject } = useQuery({
     queryKey: ["project", projectId],
@@ -127,7 +133,11 @@ export default function CreateStoryPage() {
         setNarratorVoice(p.storyNarratorVoice || "Alex");
         setAspectRatio(normalizeStoryVideoAspectRatio(p.aspectRatio));
         const loadedChars = p.storyCharacters || [];
-        setCharacters(loadedChars);
+        const clampedChars = clampCharacters(loadedChars);
+        if (loadedChars.length > clampedChars.length) {
+          toast.warning(`Only ${STORY_MAX_CHARACTERS} characters are supported.`);
+        }
+        setCharacters(clampedChars);
         const rawScript = (p.storyScript as StoryScene[]) || [];
         const castNames = loadedChars.map((c) => c.name.trim());
         const normalized = rawScript.map((s) => {
@@ -151,7 +161,7 @@ export default function CreateStoryPage() {
         setStep(p.currentStep || 2);
       });
     }
-  }, [editId, script.length]);
+  }, [clampCharacters, editId, script.length]);
 
   // Auto-trigger video generation
   useEffect(() => {
@@ -598,7 +608,7 @@ export default function CreateStoryPage() {
             open={showCharPicker}
             onClose={() => setShowCharPicker(false)}
             selected={characters}
-            onSelect={setCharacters}
+            onSelect={(next) => setCharacters(clampCharacters(next))}
             maxCharacters={STORY_MAX_CHARACTERS}
           />
         </div>
@@ -939,7 +949,7 @@ export default function CreateStoryPage() {
             </Card>
           )}
 
-          {step === 3 && pipelineDebugLogs.length > 0 && (
+          {step === 3 && showExecutionTrace && pipelineDebugLogs.length > 0 && (
             <Card className="border-border/60">
               <CardHeader className="py-3">
                 <CardTitle className="text-base font-medium">

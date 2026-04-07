@@ -24,12 +24,33 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    const freePlan = await prisma.plan.findUnique({ where: { slug: "free" } });
+
     const user = await prisma.user.create({
-      data: { email, password: hashedPassword, name },
-      select: { id: true, email: true, name: true, credits: true, createdAt: true },
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+        role: "USER",
+        ...(freePlan ? { planId: freePlan.id } : {}),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        credits: true,
+        role: true,
+        planId: true,
+        createdAt: true,
+        plan: { select: { id: true, name: true, slug: true } },
+      },
     });
 
-    const token = signToken({ userId: user.id, email: user.email });
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     return Response.json({ token, user });
   } catch (err) {
