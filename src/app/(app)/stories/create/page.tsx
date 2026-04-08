@@ -282,8 +282,8 @@ export default function CreateStoryPage() {
   });
 
 
-  const previewVoice = useCallback((voiceId: string, previewUrl: string) => {
-    if (playingVoice === voiceId) {
+  const previewVoice = useCallback((playbackKey: string, previewUrl: string) => {
+    if (playingVoice === playbackKey) {
       audioRef.current?.pause();
       setPlayingVoice(null);
       return;
@@ -293,7 +293,7 @@ export default function CreateStoryPage() {
     audio.onended = () => setPlayingVoice(null);
     audio.play();
     audioRef.current = audio;
-    setPlayingVoice(voiceId);
+    setPlayingVoice(playbackKey);
   }, [playingVoice]);
 
   // Progress computation from logs
@@ -471,12 +471,12 @@ export default function CreateStoryPage() {
                         size="icon"
                         onClick={() =>
                           previewVoice(
-                            narratorVoice,
+                            "narrator",
                             voices.find((v) => v.id === narratorVoice)!.previewUrl
                           )
                         }
                       >
-                        {playingVoice === narratorVoice ? (
+                        {playingVoice === "narrator" ? (
                           <Pause className="w-4 h-4" />
                         ) : (
                           <Play className="w-4 h-4" />
@@ -519,7 +519,9 @@ export default function CreateStoryPage() {
                       Choose a voice for each character before generating the script.
                     </p>
                   )}
-                  {characters.map((char, i) => (
+                  {characters.map((char, i) => {
+                    const charVoicePlaybackKey = `char:${char.id ?? i}:${char.voiceId ?? ""}`;
+                    return (
                     <div
                       key={char.id ?? `${char.name}-${i}`}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
@@ -560,6 +562,27 @@ export default function CreateStoryPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {char.voiceId &&
+                          voices.find((v) => v.id === char.voiceId) && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() =>
+                                previewVoice(
+                                  charVoicePlaybackKey,
+                                  voices.find((v) => v.id === char.voiceId)!
+                                    .previewUrl
+                                )
+                              }
+                            >
+                              {playingVoice === charVoicePlaybackKey ? (
+                                <Pause className="w-3.5 h-3.5" />
+                              ) : (
+                                <Play className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -572,7 +595,8 @@ export default function CreateStoryPage() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
