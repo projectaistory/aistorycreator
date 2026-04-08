@@ -12,6 +12,8 @@ import {
   Coins,
   BookOpen,
   Shield,
+  UserCircle,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +23,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/characters", label: "Characters", icon: Users },
   { href: "/stories", label: "My Stories", icon: Film },
+  { href: "/plans", label: "Plans", icon: Layers },
+  { href: "/profile", label: "Profile", icon: UserCircle },
 ];
 
 const adminNavItem = {

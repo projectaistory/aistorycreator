@@ -22,3 +22,24 @@ export async function GET(
 
   return Response.json(project);
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getAuthUser(request);
+  const authErr = requireAuth(user);
+  if (authErr) return authErr;
+
+  const { id } = await params;
+
+  const result = await prisma.project.deleteMany({
+    where: { id, userId: user!.id },
+  });
+
+  if (result.count === 0) {
+    return Response.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  return Response.json({ success: true });
+}

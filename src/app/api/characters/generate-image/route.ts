@@ -1,4 +1,7 @@
 import { NextRequest } from "next/server";
+
+/** WaveSpeed poll + CDN download + Bunny upload can exceed default serverless limits. */
+export const maxDuration = 300;
 import { getAuthUser, requireAuth } from "@/lib/auth";
 import {
   isAllowedCharacterModel,

@@ -158,7 +158,9 @@ export default function CreateStoryPage() {
           };
         });
         setScript(normalized);
-        setStep(p.currentStep || 2);
+        // DB uses currentStep 5 when the final video is done; UI only has steps 1–3.
+        const dbStep = p.currentStep ?? 2;
+        setStep(Math.min(Math.max(dbStep, 1), 3));
       });
     }
   }, [clampCharacters, editId, script.length]);

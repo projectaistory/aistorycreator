@@ -95,3 +95,15 @@ export interface AuthResponse {
   token: string;
   user: User;
 }
+
+/** Public plan row from `GET /api/plans` */
+export interface BillingPlan {
+  id: string;
+  name: string;
+  slug: string;
+  features: unknown;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -1,5 +1,22 @@
-import { fetch as undiciFetch } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 import { nanoid } from "nanoid";
+
+/**
+ * Downloads from third-party CDNs (e.g. WaveSpeed result URLs). Node’s default fetch
+ * uses short connect timeouts; large images over slow TLS often throw `fetch failed`.
+ */
+const assetDownloadAgent = new Agent({
+  connectTimeout: 180_000,
+  headersTimeout: 600_000,
+  bodyTimeout: 600_000,
+  keepAliveTimeout: 120_000,
+});
+
+const bunnyUploadAgent = new Agent({
+  connectTimeout: 120_000,
+  headersTimeout: 600_000,
+  bodyTimeout: 600_000,
+});
 
 type BunnyTrace = (line: string) => void | Promise<void>;
 
@@ -57,30 +74,74 @@ function pickExtension(sourceUrl: string, preferredExt: string): string {
   return preferredExt.replace(/^\./, "");
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function downloadToBuffer(
   sourceUrl: string,
   maxBytes: number
 ): Promise<Buffer> {
-  const res = await undiciFetch(sourceUrl, {
-    method: "GET",
-    redirect: "follow",
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Source download failed (${res.status}): ${text.slice(0, 220)}`);
-  }
-  const cl = res.headers.get("content-length");
-  if (cl) {
-    const n = parseInt(cl, 10);
-    if (!Number.isNaN(n) && n > maxBytes) {
-      throw new Error(`Source file too large (${n} bytes, max ${maxBytes})`);
+  const attempts = 3;
+  let lastErr: unknown;
+  for (let a = 1; a <= attempts; a++) {
+    try {
+      const res = await undiciFetch(sourceUrl, {
+        method: "GET",
+        redirect: "follow",
+        dispatcher: assetDownloadAgent,
+        headers: {
+          Accept: "image/*,*/*;q=0.8",
+          "User-Agent": "AiStoryCreator-asset-fetch/1.0",
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(
+          `Source download failed (${res.status}): ${text.slice(0, 220)}`
+        );
+      }
+      const cl = res.headers.get("content-length");
+      if (cl) {
+        const n = parseInt(cl, 10);
+        if (!Number.isNaN(n) && n > maxBytes) {
+          throw new Error(`Source file too large (${n} bytes, max ${maxBytes})`);
+        }
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length > maxBytes) {
+        throw new Error(
+          `Source file too large (${buf.length} bytes, max ${maxBytes})`
+        );
+      }
+      return buf;
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      const retryable =
+        a < attempts &&
+        (msg.includes("fetch failed") ||
+          msg.includes("ECONNRESET") ||
+          msg.includes("ETIMEDOUT") ||
+          msg.includes("UND_ERR_CONNECT_TIMEOUT") ||
+          msg.includes("UND_ERR_HEADERS_TIMEOUT") ||
+          msg.includes("UND_ERR_BODY_TIMEOUT"));
+      if (retryable) {
+        await sleep(800 * a);
+        continue;
+      }
+      let host = "remote host";
+      try {
+        host = new URL(sourceUrl).hostname;
+      } catch {
+        /* ignore */
+      }
+      throw e instanceof Error
+        ? new Error(`Could not download image from ${host}: ${msg}`)
+        : e;
     }
   }
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > maxBytes) {
-    throw new Error(`Source file too large (${buf.length} bytes, max ${maxBytes})`);
-  }
-  return buf;
+  throw lastErr;
 }
 
 function isAlreadyOnConfiguredBunnyCdn(sourceUrl: string): boolean {
@@ -120,8 +181,9 @@ export async function ensureUrlOnBunnyStorage(
     `bunny upload ${options.label ?? "asset"} start source=${sourceUrl}`
   );
   const buffer = await downloadToBuffer(sourceUrl, maxBytes);
-  const up = await fetch(putUrl, {
+  const up = await undiciFetch(putUrl, {
     method: "PUT",
+    dispatcher: bunnyUploadAgent,
     headers: {
       AccessKey: accessKey,
       "Content-Type": options.contentType,
