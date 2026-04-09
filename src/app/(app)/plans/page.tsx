@@ -1,55 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/use-auth";
 import { apiRequest } from "@/lib/api-client";
-import type { BillingPlan, User } from "@/types";
+import type { BillingPlan } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, ExternalLink, Sparkles } from "lucide-react";
-import { toast } from "sonner";
 
 const billingPortalUrl = process.env.NEXT_PUBLIC_BILLING_PORTAL_URL ?? "";
 
-function errMessage(err: unknown, fallback: string) {
-  if (err && typeof err === "object" && "error" in err) {
-    const m = (err as { error?: string }).error;
-    if (typeof m === "string" && m) return m;
-  }
-  return fallback;
-}
-
 export default function PlansPage() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [annual, setAnnual] = useState(false);
-  const [planLoadingId, setPlanLoadingId] = useState<string | null>(null);
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["public-plans"],
     queryFn: () => apiRequest<BillingPlan[]>("/api/plans"),
   });
-
-  async function selectPlan(planId: string) {
-    if (user?.planId === planId) return;
-    setPlanLoadingId(planId);
-    try {
-      const res = await apiRequest<{ user: User }>("/api/account/plan", {
-        method: "PATCH",
-        body: JSON.stringify({ planId }),
-      });
-      queryClient.setQueryData(["auth-user"], res.user);
-      toast.success("Plan updated");
-    } catch (err) {
-      toast.error(errMessage(err, "Could not update plan"));
-    } finally {
-      setPlanLoadingId(null);
-    }
-  }
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -60,8 +32,8 @@ export default function PlansPage() {
         </div>
         <h1 className="text-3xl font-bold">Plans &amp; billing</h1>
         <p className="text-muted-foreground mt-1 max-w-2xl">
-          Pricing and features are loaded from the database and can be updated in the admin
-          dashboard. Choose a plan to set your account tier.
+          Pricing and features are shown for reference. Self-service plan changes are not
+          available yet; new accounts use the free tier.
         </p>
       </div>
 
@@ -148,7 +120,6 @@ export default function PlansPage() {
                   const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
                   const period = annual ? "/yr" : "/mo";
                   const isCurrent = user?.planId === plan.id;
-                  const loading = planLoadingId === plan.id;
 
                   return (
                     <div
@@ -193,12 +164,16 @@ export default function PlansPage() {
                       <Separator className="opacity-50" />
                       <Button
                         type="button"
-                        variant={isCurrent ? "secondary" : "default"}
+                        variant={isCurrent ? "secondary" : "outline"}
                         className="w-full"
-                        disabled={isCurrent || loading}
-                        onClick={() => selectPlan(plan.id)}
+                        disabled
+                        title={
+                          isCurrent
+                            ? "Your current plan"
+                            : "Plan upgrades are not available yet"
+                        }
                       >
-                        {loading ? "Updating…" : isCurrent ? "Active plan" : "Choose plan"}
+                        {isCurrent ? "Active plan" : "Unavailable"}
                       </Button>
                     </div>
                   );

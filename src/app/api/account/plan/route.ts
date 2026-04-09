@@ -36,16 +36,23 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: "planId is required (or null to clear)" }, { status: 400 });
   }
 
-  if (planId !== null) {
-    const plan = await prisma.plan.findUnique({ where: { id: planId } });
-    if (!plan) {
-      return Response.json({ error: "Plan not found" }, { status: 404 });
-    }
+  const current = await prisma.user.findUnique({
+    where: { id: authed!.id },
+    select: { planId: true },
+  });
+  if (!current) {
+    return Response.json({ error: "User not found" }, { status: 404 });
   }
 
-  const user = await prisma.user.update({
+  if (planId !== current.planId) {
+    return Response.json(
+      { error: "Plan self-service is not available yet." },
+      { status: 403 }
+    );
+  }
+
+  const user = await prisma.user.findUnique({
     where: { id: authed!.id },
-    data: { planId },
     select: userSelect,
   });
 

@@ -24,7 +24,10 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const freePlan = await prisma.plan.findUnique({ where: { slug: "free" } });
+    const freePlan = await prisma.plan.findUnique({
+      where: { slug: "free" },
+      select: { id: true, includedCredits: true },
+    });
 
     const user = await prisma.user.create({
       data: {
@@ -32,7 +35,9 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         name,
         role: "USER",
-        ...(freePlan ? { planId: freePlan.id } : {}),
+        ...(freePlan
+          ? { planId: freePlan.id, credits: freePlan.includedCredits }
+          : {}),
       },
       select: {
         id: true,
