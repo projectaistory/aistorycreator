@@ -217,6 +217,14 @@ function bunnyStreamEmbedSrc(playUrl: string): string {
 function VideoShowcase() {
   const videos = [
     {
+      title: "Featured story",
+      description: "AI-generated narrative from our creators",
+      embedUrl:
+        "https://player.mediadelivery.net/play/634572/002c930a-9054-4abc-937a-c50816deaa15",
+      gradient: "from-fuchsia-600/20 to-amber-600/20",
+      accent: "bg-fuchsia-500",
+    },
+    {
       title: "Fantasy Adventure",
       description: "A hero's journey through enchanted lands",
       embedUrl:
