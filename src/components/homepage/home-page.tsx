@@ -194,6 +194,8 @@ function HeroSection() {
 }
 
 function VideoShowcase() {
+  const [activeVideoIndex, setActiveVideoIndex] = useState<number | null>(null);
+
   const videos = [
     {
       title: "Fantasy Adventure",
@@ -266,14 +268,27 @@ function VideoShowcase() {
                   video.gradient
                 )}
               >
-                <iframe
-                  src={video.embedUrl}
-                  title={video.title}
-                  className="absolute inset-0 h-full w-full"
-                  loading="lazy"
-                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                  allowFullScreen
-                />
+                {activeVideoIndex === i ? (
+                  <iframe
+                    src={video.embedUrl}
+                    title={video.title}
+                    className="absolute inset-0 h-full w-full"
+                    loading="lazy"
+                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                    allowFullScreen
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setActiveVideoIndex(i)}
+                    className="absolute inset-0 flex items-center justify-center bg-black/35 outline-none transition-colors hover:bg-black/25 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ring-offset-background"
+                    aria-label={`Play ${video.title}`}
+                  >
+                    <span className="rounded-full bg-white/90 p-4 shadow-lg">
+                      <Play className="size-6 text-black" />
+                    </span>
+                  </button>
+                )}
 
                 {/* Bottom gradient */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
