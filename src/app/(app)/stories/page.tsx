@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Character } from "@/types";
+import { normalizeStoryVideoAspectRatio } from "@/lib/constants";
 
 interface ProjectListItem {
   id: string;
@@ -45,11 +46,14 @@ interface ProjectListItem {
   previewImageUrl: string | null;
 }
 
-/** First-frame preview for Bunny (or any) MP4 on CDN */
+/**
+ * Seek URL for inline `<video>` thumbnails when no scene still is available.
+ * Slightly past t=0 avoids all-black first frames that some encoders emit before the first keyframe.
+ */
 function storyVideoThumbnailSrc(videoUrl: string): string {
   const u = videoUrl.trim();
   if (!u) return u;
-  const hash = u.includes("#") ? "" : "#t=0.001";
+  const hash = u.includes("#") ? "" : "#t=0.25";
   return `${u}${hash}`;
 }
 
@@ -268,6 +272,7 @@ export default function StoriesPage() {
           {projects.map((p) => {
             const status = storyStatusLabel(p);
             const StatusIcon = status.icon;
+            const storyAspect = normalizeStoryVideoAspectRatio(p.aspectRatio);
             const title =
               (p.storyPrompt?.trim() || "Untitled story").slice(0, 120) +
               (p.storyPrompt && p.storyPrompt.length > 120 ? "…" : "");
@@ -276,7 +281,9 @@ export default function StoriesPage() {
                 <Card className="h-full overflow-hidden transition-colors hover:bg-muted/40">
                   <div
                     className={`relative bg-muted ${
-                      p.aspectRatio === "9:16" ? "aspect-[9/16] max-h-64 mx-auto" : "aspect-video"
+                      storyAspect === "9:16"
+                        ? "aspect-[9/16] max-h-64 mx-auto"
+                        : "aspect-video"
                     }`}
                   >
                     <Button
@@ -300,19 +307,27 @@ export default function StoriesPage() {
                             url: p.finalVideoUrl!,
                             title:
                               p.storyPrompt?.trim() || "Untitled story",
-                            aspectRatio: p.aspectRatio,
+                            aspectRatio: storyAspect,
                           })
                         }
                       >
-                        <video
-                          src={storyVideoThumbnailSrc(p.finalVideoUrl)}
-                          poster={p.previewImageUrl ?? undefined}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-                          aria-hidden
-                        />
+                        {p.previewImageUrl ? (
+                          <img
+                            src={p.previewImageUrl}
+                            alt=""
+                            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <video
+                            src={storyVideoThumbnailSrc(p.finalVideoUrl)}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                            aria-hidden
+                          />
+                        )}
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
                           <div className="rounded-full bg-background/90 p-3 shadow-md">
                             <Play className="h-6 w-6 text-foreground" aria-hidden />
@@ -364,7 +379,7 @@ export default function StoriesPage() {
                         {new Date(p.createdAt).toLocaleString()}
                       </span>
                       <span>{p.storyDuration}s</span>
-                      <span>{p.aspectRatio}</span>
+                      <span>{storyAspect}</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       {p.finalVideoUrl ? (
@@ -378,7 +393,7 @@ export default function StoriesPage() {
                                 url: p.finalVideoUrl!,
                                 title:
                                   p.storyPrompt?.trim() || "Untitled story",
-                                aspectRatio: p.aspectRatio,
+                                aspectRatio: storyAspect,
                               })
                             }
                           >

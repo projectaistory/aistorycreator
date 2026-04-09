@@ -1,6 +1,7 @@
 export const STORY_DURATION_MIN = 30;
 export const STORY_DURATION_MAX = 300;
 export const STORY_MAX_CHARACTERS = 3;
+export const STORY_DEFAULT_ASPECT_RATIO: "16:9" | "9:16" = "9:16";
 export const STORY_DEFAULT_NARRATOR_VOICE = "Alex";
 export const STORY_VIDEO_CREDITS_PER_30_SECONDS = 2000;
 

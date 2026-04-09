@@ -77,7 +77,7 @@ model Project {
   storyScenePrompts    Json            @default("[]")
   storySceneImages     Json            @default("[]")
   storyAudioUrls       Json            @default("[]")
-  aspectRatio          String          @default("16:9")
+  aspectRatio          String          @default("9:16")
   videoQuality         String          @default("quick")
   generationStatus     String?
   generationStartedAt  DateTime?

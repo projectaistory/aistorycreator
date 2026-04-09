@@ -31,8 +31,10 @@ export async function GET(request: NextRequest) {
     projects: projects.map((p) => {
       const sceneImages = p.storySceneImages as unknown;
       const previewImageUrl =
-        Array.isArray(sceneImages) && typeof sceneImages[0] === "string"
-          ? sceneImages[0]
+        Array.isArray(sceneImages)
+          ? sceneImages.find(
+              (u): u is string => typeof u === "string" && u.trim().length > 0
+            ) ?? null
           : null;
       return {
         id: p.id,

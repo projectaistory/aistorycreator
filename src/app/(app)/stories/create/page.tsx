@@ -43,6 +43,7 @@ import {
   STORY_DURATION_MIN,
   STORY_DURATION_MAX,
   STORY_MAX_CHARACTERS,
+  STORY_DEFAULT_ASPECT_RATIO,
   getStoryVideoGenerationCredits,
   normalizeStoryVideoAspectRatio,
 } from "@/lib/constants";
@@ -67,7 +68,7 @@ export default function CreateStoryPage() {
   const [duration, setDuration] = useState(60);
   const [narrator, setNarrator] = useState(true);
   const [narratorVoice, setNarratorVoice] = useState("Alex");
-  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [aspectRatio, setAspectRatio] = useState(STORY_DEFAULT_ASPECT_RATIO);
   const [characters, setCharacters] = useState<StoryCharacter[]>([]);
   const [showCharPicker, setShowCharPicker] = useState(false);
 
