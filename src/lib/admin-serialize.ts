@@ -8,6 +8,7 @@ export function serializePlan(plan: Plan) {
     features: plan.features as unknown,
     monthlyPrice: Number(plan.monthlyPrice),
     yearlyPrice: Number(plan.yearlyPrice),
+    includedCredits: plan.includedCredits,
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
   };

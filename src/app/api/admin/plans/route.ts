@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     features?: unknown;
     monthlyPrice?: unknown;
     yearlyPrice?: unknown;
+    includedCredits?: unknown;
   };
   try {
     body = await request.json();
@@ -52,6 +53,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let includedCredits = 0;
+  if (body.includedCredits !== undefined) {
+    if (
+      typeof body.includedCredits !== "number" ||
+      !Number.isFinite(body.includedCredits) ||
+      !Number.isInteger(body.includedCredits) ||
+      body.includedCredits < 0
+    ) {
+      return Response.json(
+        { error: "includedCredits must be a non-negative integer" },
+        { status: 400 }
+      );
+    }
+    includedCredits = body.includedCredits;
+  }
+
   let features: Prisma.InputJsonValue = [];
   if (Array.isArray(body.features)) {
     features = body.features as Prisma.InputJsonValue;
@@ -67,6 +84,7 @@ export async function POST(request: NextRequest) {
         features,
         monthlyPrice: monthly,
         yearlyPrice: yearly,
+        includedCredits,
       },
     });
     return Response.json({ plan: serializePlan(plan) }, { status: 201 });

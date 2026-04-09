@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, requireAuth } from "@/lib/auth";
+import {
+  FREE_PLAN_MAX_SAVED_CHARACTERS,
+  isFreePlanSlug,
+} from "@/lib/planLimits";
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -26,6 +30,28 @@ export async function POST(request: NextRequest) {
     return Response.json(
       { error: "Name and imageUrl are required" },
       { status: 400 }
+    );
+  }
+
+  const me = await prisma.user.findUnique({
+    where: { id: user!.id },
+    select: {
+      plan: { select: { slug: true } },
+      _count: { select: { characters: true } },
+    },
+  });
+
+  if (
+    me &&
+    isFreePlanSlug(me.plan?.slug) &&
+    me._count.characters >= FREE_PLAN_MAX_SAVED_CHARACTERS
+  ) {
+    return Response.json(
+      {
+        error: `Free plan includes up to ${FREE_PLAN_MAX_SAVED_CHARACTERS} saved characters. Delete one to add another, or upgrade your plan.`,
+        freePlanMaxCharacters: FREE_PLAN_MAX_SAVED_CHARACTERS,
+      },
+      { status: 403 }
     );
   }
 

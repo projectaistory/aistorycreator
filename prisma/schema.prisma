@@ -13,12 +13,13 @@ enum UserRole {
 }
 
 model Plan {
-  id           String   @id @default(uuid())
-  name         String   @unique
-  slug         String   @unique
-  features     Json     @default("[]")
-  monthlyPrice Decimal  @db.Decimal(10, 2)
-  yearlyPrice  Decimal  @db.Decimal(10, 2)
+  id               String   @id @default(uuid())
+  name             String   @unique
+  slug             String   @unique
+  features         Json     @default("[]")
+  monthlyPrice     Decimal  @db.Decimal(10, 2)
+  yearlyPrice      Decimal  @db.Decimal(10, 2)
+  includedCredits  Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   users        User[]

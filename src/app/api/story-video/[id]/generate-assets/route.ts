@@ -6,6 +6,10 @@ import {
   normalizeStoryVideoAspectRatio,
 } from "@/lib/constants";
 import {
+  FREE_PLAN_MAX_STORY_DURATION_SECONDS,
+  isFreePlanSlug,
+} from "@/lib/planLimits";
+import {
   generateStoryAudio,
   generateSceneImages,
   generateSceneImagesFromText,
@@ -44,7 +48,27 @@ export async function POST(
   }
 
   const creditsRequired = getStoryVideoGenerationCredits(project.storyDuration);
-  const dbUser = await prisma.user.findUnique({ where: { id: user!.id } });
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user!.id },
+    select: {
+      credits: true,
+      plan: { select: { slug: true } },
+    },
+  });
+
+  if (
+    dbUser &&
+    isFreePlanSlug(dbUser.plan?.slug) &&
+    project.storyDuration > FREE_PLAN_MAX_STORY_DURATION_SECONDS
+  ) {
+    return Response.json(
+      {
+        error: `Free plan videos are limited to ${FREE_PLAN_MAX_STORY_DURATION_SECONDS} seconds. Create a new story with a shorter duration or upgrade your plan.`,
+        freePlanMaxDurationSeconds: FREE_PLAN_MAX_STORY_DURATION_SECONDS,
+      },
+      { status: 403 }
+    );
+  }
 
   if (!dbUser || dbUser.credits < creditsRequired) {
     return Response.json(

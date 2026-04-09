@@ -5,10 +5,10 @@ import { generateStoryScript } from "@/services/openai";
 import type { Prisma } from "@prisma/client";
 import {
   STORY_DURATION_MIN,
-  STORY_DURATION_MAX,
   STORY_MAX_CHARACTERS,
   normalizeStoryVideoAspectRatio,
 } from "@/lib/constants";
+import { maxStoryDurationSecondsForPlan } from "@/lib/planLimits";
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "storyPrompt is required" }, { status: 400 });
     }
 
+    const durationCap = maxStoryDurationSecondsForPlan(user!.plan?.slug);
     const duration = Math.max(
       STORY_DURATION_MIN,
-      Math.min(STORY_DURATION_MAX, rawDuration || 60)
+      Math.min(durationCap, Number(rawDuration) || 60)
     );
 
     const aspectRatio = normalizeStoryVideoAspectRatio(rawAspect);

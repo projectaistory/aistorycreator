@@ -46,6 +46,7 @@ type AdminPlan = {
   features: unknown;
   monthlyPrice: number;
   yearlyPrice: number;
+  includedCredits: number;
 };
 
 export default function AdminUsersPage() {

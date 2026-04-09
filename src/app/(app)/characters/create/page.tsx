@@ -15,12 +15,27 @@ import { Sparkles, Save, Loader2, ArrowLeft, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { CharacterStyle } from "@/types";
+import { useAuth } from "@/lib/use-auth";
+import {
+  FREE_PLAN_MAX_SAVED_CHARACTERS,
+  isFreePlanSlug,
+} from "@/lib/planLimits";
 
 const THUMB_FALLBACK =
   "https://via.placeholder.com/150?text=No+Image";
 
 export default function CreateCharacterPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { data: charsRes } = useQuery({
+    queryKey: ["characters"],
+    queryFn: () => apiRequest<{ characters: { id: string }[] }>("/api/characters"),
+  });
+  const savedCount = charsRes?.characters?.length ?? 0;
+  const atFreeCharacterLimit =
+    isFreePlanSlug(user?.plan?.slug) &&
+    savedCount >= FREE_PLAN_MAX_SAVED_CHARACTERS;
+
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [selectedStyle, setSelectedStyle] = useState<CharacterStyle | null>(null);
@@ -102,6 +117,16 @@ export default function CreateCharacterPage() {
           </p>
         </div>
       </div>
+
+      {atFreeCharacterLimit ? (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-4 text-sm text-muted-foreground">
+            Free plan includes up to {FREE_PLAN_MAX_SAVED_CHARACTERS} saved
+            characters ({savedCount}/{FREE_PLAN_MAX_SAVED_CHARACTERS} used).
+            Delete a character from your library or upgrade to create more.
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -241,7 +266,9 @@ export default function CreateCharacterPage() {
                 <Button
                   onClick={() => saveMutation.mutate()}
                   className="flex-1"
-                  disabled={!name || saveMutation.isPending}
+                  disabled={
+                    !name || saveMutation.isPending || atFreeCharacterLimit
+                  }
                 >
                   {saveMutation.isPending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

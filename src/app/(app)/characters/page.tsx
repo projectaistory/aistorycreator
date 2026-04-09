@@ -9,9 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Trash2, Users, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { Character } from "@/types";
+import { useAuth } from "@/lib/use-auth";
+import {
+  FREE_PLAN_MAX_SAVED_CHARACTERS,
+  isFreePlanSlug,
+} from "@/lib/planLimits";
 
 export default function CharactersPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data, isLoading } = useQuery({
     queryKey: ["characters"],
@@ -28,6 +34,9 @@ export default function CharactersPage() {
   });
 
   const characters = data?.characters || [];
+  const atFreeCharacterLimit =
+    isFreePlanSlug(user?.plan?.slug) &&
+    characters.length >= FREE_PLAN_MAX_SAVED_CHARACTERS;
 
   return (
     <div className="space-y-6">
@@ -38,12 +47,23 @@ export default function CharactersPage() {
             Your AI-generated characters for story creation
           </p>
         </div>
-        <Link href="/characters/create">
-          <Button className="gap-2">
+        {atFreeCharacterLimit ? (
+          <Button
+            className="gap-2"
+            disabled
+            title={`Free plan: up to ${FREE_PLAN_MAX_SAVED_CHARACTERS} characters`}
+          >
             <PlusCircle className="w-4 h-4" />
             Create Character
           </Button>
-        </Link>
+        ) : (
+          <Link href="/characters/create">
+            <Button className="gap-2">
+              <PlusCircle className="w-4 h-4" />
+              Create Character
+            </Button>
+          </Link>
+        )}
       </div>
 
       {isLoading ? (

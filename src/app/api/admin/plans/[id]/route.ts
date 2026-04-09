@@ -31,6 +31,7 @@ export async function PATCH(
     features?: Prisma.InputJsonValue;
     monthlyPrice?: number;
     yearlyPrice?: number;
+    includedCredits?: number;
   } = {};
 
   if (typeof body.name === "string" && body.name.trim()) {
@@ -56,6 +57,20 @@ export async function PATCH(
       return Response.json({ error: "yearlyPrice must be >= 0" }, { status: 400 });
     }
     data.yearlyPrice = body.yearlyPrice;
+  }
+  if (body.includedCredits !== undefined) {
+    if (
+      typeof body.includedCredits !== "number" ||
+      !Number.isFinite(body.includedCredits) ||
+      !Number.isInteger(body.includedCredits) ||
+      body.includedCredits < 0
+    ) {
+      return Response.json(
+        { error: "includedCredits must be a non-negative integer" },
+        { status: 400 }
+      );
+    }
+    data.includedCredits = body.includedCredits;
   }
 
   if (Object.keys(data).length === 0) {

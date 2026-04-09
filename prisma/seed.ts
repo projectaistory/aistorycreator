@@ -14,6 +14,7 @@ const PLANS = [
     ],
     monthlyPrice: 0,
     yearlyPrice: 0,
+    includedCredits: 2_000,
   },
   {
     name: "Basic",
@@ -26,6 +27,7 @@ const PLANS = [
     ],
     monthlyPrice: 9.99,
     yearlyPrice: 99,
+    includedCredits: 20_000,
   },
   {
     name: "Pro",
@@ -39,6 +41,7 @@ const PLANS = [
     ],
     monthlyPrice: 29.99,
     yearlyPrice: 299,
+    includedCredits: 80_000,
   },
 ] as const;
 
@@ -79,12 +82,14 @@ async function main() {
         features: [...p.features],
         monthlyPrice: p.monthlyPrice,
         yearlyPrice: p.yearlyPrice,
+        includedCredits: p.includedCredits,
       },
       update: {
         name: p.name,
         features: [...p.features],
         monthlyPrice: p.monthlyPrice,
         yearlyPrice: p.yearlyPrice,
+        includedCredits: p.includedCredits,
       },
     });
   }

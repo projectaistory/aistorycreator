@@ -104,6 +104,7 @@ export interface BillingPlan {
   features: unknown;
   monthlyPrice: number;
   yearlyPrice: number;
+  includedCredits: number;
   createdAt: string;
   updatedAt: string;
 }

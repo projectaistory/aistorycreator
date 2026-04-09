@@ -25,6 +25,7 @@ type AdminPlan = {
   features: unknown;
   monthlyPrice: number;
   yearlyPrice: number;
+  includedCredits: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -50,6 +51,7 @@ export default function AdminPlansPage() {
     slug: "",
     monthlyPrice: 0,
     yearlyPrice: 0,
+    includedCredits: 0,
     featureLines: "",
   });
 
@@ -103,6 +105,7 @@ export default function AdminPlansPage() {
       slug: "",
       monthlyPrice: 0,
       yearlyPrice: 0,
+      includedCredits: 0,
       featureLines: "",
     });
   }
@@ -114,6 +117,7 @@ export default function AdminPlansPage() {
       slug: p.slug,
       monthlyPrice: p.monthlyPrice,
       yearlyPrice: p.yearlyPrice,
+      includedCredits: p.includedCredits ?? 0,
       featureLines: featuresToLines(p.features),
     });
   }
@@ -132,6 +136,7 @@ export default function AdminPlansPage() {
         slug: form.slug,
         monthlyPrice: form.monthlyPrice,
         yearlyPrice: form.yearlyPrice,
+        includedCredits: form.includedCredits,
         features: linesToFeatures(form.featureLines),
       },
     });
@@ -143,6 +148,7 @@ export default function AdminPlansPage() {
       slug: form.slug,
       monthlyPrice: form.monthlyPrice,
       yearlyPrice: form.yearlyPrice,
+      includedCredits: form.includedCredits,
       features: linesToFeatures(form.featureLines),
     });
   }
@@ -206,7 +212,7 @@ export default function AdminPlansPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-6">
+                <div className="flex flex-wrap gap-6">
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">
                       Monthly
@@ -221,6 +227,14 @@ export default function AdminPlansPage() {
                     </p>
                     <p className="text-2xl font-bold tabular-nums">
                       ${p.yearlyPrice.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      Credits included
+                    </p>
+                    <p className="text-2xl font-bold tabular-nums">
+                      {(p.includedCredits ?? 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -288,6 +302,7 @@ function PlanFormFields({
     slug: string;
     monthlyPrice: number;
     yearlyPrice: number;
+    includedCredits: number;
     featureLines: string;
   };
   setForm: React.Dispatch<
@@ -296,6 +311,7 @@ function PlanFormFields({
       slug: string;
       monthlyPrice: number;
       yearlyPrice: number;
+      includedCredits: number;
       featureLines: string;
     }>
   >;
@@ -347,6 +363,22 @@ function PlanFormFields({
             }
           />
         </div>
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="p-credits">Credits included</Label>
+        <Input
+          id="p-credits"
+          type="number"
+          min={0}
+          step={1}
+          value={form.includedCredits}
+          onChange={(e) =>
+            setForm((f) => ({
+              ...f,
+              includedCredits: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+            }))
+          }
+        />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="p-features">Features (one per line)</Label>

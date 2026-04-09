@@ -48,6 +48,11 @@ import {
   normalizeStoryVideoAspectRatio,
 } from "@/lib/constants";
 import {
+  FREE_PLAN_MAX_STORY_DURATION_SECONDS,
+  maxStoryDurationSecondsForPlan,
+} from "@/lib/planLimits";
+import { useAuth } from "@/lib/use-auth";
+import {
   isNarratorCharacter,
   resolveCanonicalSpeaker,
 } from "@/lib/storyTtsVoices";
@@ -59,6 +64,8 @@ export default function CreateStoryPage() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
   const showExecutionTrace = searchParams.get("DEBUG") === "1";
+  const { user } = useAuth();
+  const storyDurationMax = maxStoryDurationSecondsForPlan(user?.plan?.slug);
 
   // Step tracking
   const [step, setStep] = useState(1);
@@ -99,6 +106,12 @@ export default function CreateStoryPage() {
     (next: StoryCharacter[]) => next.slice(0, STORY_MAX_CHARACTERS),
     []
   );
+
+  useEffect(() => {
+    setDuration((d) =>
+      Math.max(STORY_DURATION_MIN, Math.min(d, storyDurationMax))
+    );
+  }, [storyDurationMax]);
 
   // Polling for project status — stop once we have the final video or it failed
   const { data: project, refetch: refetchProject } = useQuery({
@@ -413,16 +426,22 @@ export default function CreateStoryPage() {
                   <Label>
                     Duration: {duration}s ({Math.floor(duration / 5)} scenes)
                   </Label>
+                  {storyDurationMax === FREE_PLAN_MAX_STORY_DURATION_SECONDS ? (
+                    <p className="text-xs text-muted-foreground">
+                      Free plan: videos are limited to{" "}
+                      {FREE_PLAN_MAX_STORY_DURATION_SECONDS} seconds.
+                    </p>
+                  ) : null}
                   <Slider
                     value={[duration]}
                     onValueChange={(v) => setDuration(Array.isArray(v) ? v[0] : v)}
                     min={STORY_DURATION_MIN}
-                    max={STORY_DURATION_MAX}
+                    max={storyDurationMax}
                     step={5}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{STORY_DURATION_MIN}s</span>
-                    <span>{STORY_DURATION_MAX}s</span>
+                    <span>{storyDurationMax}s</span>
                   </div>
                 </div>
 

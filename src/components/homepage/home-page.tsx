@@ -27,6 +27,7 @@ interface Plan {
   features: unknown;
   monthlyPrice: number;
   yearlyPrice: number;
+  includedCredits: number;
   createdAt: string;
   updatedAt: string;
 }
