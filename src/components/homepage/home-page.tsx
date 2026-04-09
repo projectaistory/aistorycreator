@@ -131,7 +131,7 @@ function Navbar() {
 
 function HeroSection() {
   return (
-    <section className="relative z-10 px-6 pb-24 pt-20 md:pb-32 md:pt-28">
+    <section className="relative z-10 px-6 pb-16 pt-16 md:pb-20 md:pt-24">
       <div className="mx-auto max-w-5xl text-center">
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
           <Zap className="size-3.5" />
@@ -198,37 +198,47 @@ function VideoShowcase() {
     {
       title: "Fantasy Adventure",
       description: "A hero's journey through enchanted lands",
+      embedUrl:
+        "https://player.mediadelivery.net/play/634572/2f956f34-dbc7-4b21-aaa7-eb2f731329bf",
       gradient: "from-violet-600/20 to-indigo-600/20",
       accent: "bg-violet-500",
     },
     {
       title: "Sci-Fi Epic",
       description: "Interstellar exploration and alien encounters",
+      embedUrl:
+        "https://player.mediadelivery.net/play/634572/6c4a0d2a-1aa6-4496-9100-c79cc7f805fc",
       gradient: "from-cyan-600/20 to-blue-600/20",
       accent: "bg-cyan-500",
     },
     {
       title: "Mystery Thriller",
       description: "Dark secrets and unexpected twists",
+      embedUrl:
+        "https://player.mediadelivery.net/play/634572/c81bc593-6e8e-40a1-bbe4-e41abaa27eea",
       gradient: "from-rose-600/20 to-orange-600/20",
       accent: "bg-rose-500",
     },
     {
       title: "Children's Tale",
       description: "Whimsical adventures for young minds",
+      embedUrl:
+        "https://player.mediadelivery.net/play/634572/2340fd24-ed6a-4ae0-9c31-d0c4d137dcbb",
       gradient: "from-emerald-600/20 to-teal-600/20",
       accent: "bg-emerald-500",
     },
     {
       title: "Horror Story",
       description: "Spine-chilling narratives that haunt",
+      embedUrl:
+        "https://player.mediadelivery.net/play/634572/bdade93e-0029-4b8b-8794-39d4b89a3d37",
       gradient: "from-red-600/20 to-purple-600/20",
       accent: "bg-red-500",
     },
   ];
 
   return (
-    <section id="showcase" className="relative z-10 px-6 py-24">
+    <section id="showcase" className="relative z-10 px-6 py-16 md:py-20">
       <div className="mx-auto max-w-7xl">
         <div className="mb-16 text-center">
           <Badge variant="outline" className="mb-4">
@@ -252,49 +262,30 @@ function VideoShowcase() {
             >
               <div
                 className={cn(
-                  "relative flex h-[420px] w-[236px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b md:h-[520px] md:w-[292px]",
+                  "relative flex h-[420px] w-[315px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b md:h-[520px] md:w-[390px]",
                   video.gradient
                 )}
               >
-                {/* Play button overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
-                  <div className="flex size-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-md transition-transform duration-300 group-hover:scale-110">
-                    <Play className="ml-1 size-7 text-white" />
-                  </div>
-                </div>
-
-                {/* Placeholder visual */}
-                <div className="flex flex-col items-center gap-4 px-6 text-center">
-                  <div
-                    className={cn(
-                      "flex size-14 items-center justify-center rounded-xl",
-                      video.accent,
-                      "bg-opacity-20"
-                    )}
-                  >
-                    <Film className="size-6 text-white/80" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-white/90">
-                      {video.title}
-                    </p>
-                    <p className="text-xs text-white/50">{video.description}</p>
-                  </div>
-                </div>
+                <iframe
+                  src={video.embedUrl}
+                  title={video.title}
+                  className="absolute inset-0 h-full w-full"
+                  loading="lazy"
+                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                  allowFullScreen
+                />
 
                 {/* Bottom gradient */}
-                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-4">
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4">
                   <p className="text-xs font-medium text-white/80">
                     {video.title}
                   </p>
-                  <p className="text-[10px] text-white/40">
-                    AI Generated • 9:16
-                  </p>
+                  <p className="text-[10px] text-white/40">{video.description}</p>
                 </div>
 
                 {/* Decorative shimmer */}
-                <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-white/5 via-transparent to-transparent" />
+                <div className="pointer-events-none absolute -inset-px rounded-2xl bg-gradient-to-b from-white/5 via-transparent to-transparent" />
               </div>
             </div>
           ))}
@@ -330,7 +321,7 @@ function HowItWorks() {
   ];
 
   return (
-    <section id="how-it-works" className="relative z-10 px-6 py-24">
+    <section id="how-it-works" className="relative z-10 px-6 py-16 md:py-20">
       <div className="mx-auto max-w-6xl">
         <div className="mb-16 text-center">
           <Badge variant="outline" className="mb-4">
@@ -385,7 +376,7 @@ function PricingSection({ plans }: { plans: Plan[] }) {
   };
 
   return (
-    <section id="pricing" className="relative z-10 px-6 py-24">
+    <section id="pricing" className="relative z-10 px-6 py-16 md:py-20">
       <div className="mx-auto max-w-6xl">
         <div className="mb-16 text-center">
           <Badge variant="outline" className="mb-4">
@@ -537,7 +528,7 @@ function FAQSection() {
   ];
 
   return (
-    <section id="faq" className="relative z-10 px-6 py-24">
+    <section id="faq" className="relative z-10 px-6 py-16 md:py-20">
       <div className="mx-auto max-w-3xl">
         <div className="mb-16 text-center">
           <Badge variant="outline" className="mb-4">
@@ -601,7 +592,7 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 
 function CTASection() {
   return (
-    <section className="relative z-10 px-6 py-24">
+    <section className="relative z-10 px-6 py-16 md:py-20">
       <div className="mx-auto max-w-4xl">
         <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-b from-primary/10 via-card/80 to-card/80 px-8 py-16 text-center md:px-16">
           {/* Glow effects */}

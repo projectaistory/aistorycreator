@@ -2,6 +2,18 @@ import { NextRequest } from "next/server";
 import { getAuthUser, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function firstSceneStillUrl(sceneImagesJson: unknown): string | null {
+  if (!Array.isArray(sceneImagesJson)) return null;
+  for (const item of sceneImagesJson) {
+    if (typeof item === "string" && item.trim().length > 0) return item.trim();
+    if (item && typeof item === "object" && "url" in item) {
+      const url = (item as { url: unknown }).url;
+      if (typeof url === "string" && url.trim().length > 0) return url.trim();
+    }
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   const err = requireAdmin(user);
@@ -30,6 +42,26 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const videos = await prisma.project.findMany({
+    where: {
+      finalVideoUrl: { not: null },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      storyPrompt: true,
+      finalVideoUrl: true,
+      storySceneImages: true,
+      createdAt: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
   return Response.json({
     stats: {
       users: userCount,
@@ -41,6 +73,14 @@ export async function GET(request: NextRequest) {
     recentUsers: recentUsers.map((u) => ({
       ...u,
       createdAt: u.createdAt.toISOString(),
+    })),
+    videos: videos.map((video) => ({
+      id: video.id,
+      storyPrompt: video.storyPrompt,
+      finalVideoUrl: video.finalVideoUrl,
+      previewImageUrl: firstSceneStillUrl(video.storySceneImages),
+      createdAt: video.createdAt.toISOString(),
+      user: video.user,
     })),
   });
 }
