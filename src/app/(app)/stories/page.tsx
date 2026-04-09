@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import type { Character } from "@/types";
 import { normalizeStoryVideoAspectRatio } from "@/lib/constants";
+import { StoryCardThumbnail } from "@/components/stories/story-card-thumbnail";
 
 interface ProjectListItem {
   id: string;
@@ -44,17 +45,6 @@ interface ProjectListItem {
   aspectRatio: string;
   /** First scene still; used when final video is not ready yet */
   previewImageUrl: string | null;
-}
-
-/**
- * Seek URL for inline `<video>` thumbnails when no scene still is available.
- * Slightly past t=0 avoids all-black first frames that some encoders emit before the first keyframe.
- */
-function storyVideoThumbnailSrc(videoUrl: string): string {
-  const u = videoUrl.trim();
-  if (!u) return u;
-  const hash = u.includes("#") ? "" : "#t=0.25";
-  return `${u}${hash}`;
 }
 
 type PlaybackState = {
@@ -280,9 +270,9 @@ export default function StoriesPage() {
               <li key={p.id}>
                 <Card className="h-full overflow-hidden transition-colors hover:bg-muted/40">
                   <div
-                    className={`relative bg-muted ${
+                    className={`relative min-h-0 w-full bg-muted ${
                       storyAspect === "9:16"
-                        ? "aspect-[9/16] max-h-64 mx-auto"
+                        ? "aspect-[9/16] max-h-64 max-w-[220px] mx-auto"
                         : "aspect-video"
                     }`}
                   >
@@ -311,23 +301,10 @@ export default function StoriesPage() {
                           })
                         }
                       >
-                        {p.previewImageUrl ? (
-                          <img
-                            src={p.previewImageUrl}
-                            alt=""
-                            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <video
-                            src={storyVideoThumbnailSrc(p.finalVideoUrl)}
-                            muted
-                            playsInline
-                            preload="metadata"
-                            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-                            aria-hidden
-                          />
-                        )}
+                        <StoryCardThumbnail
+                          previewImageUrl={p.previewImageUrl}
+                          videoUrl={p.finalVideoUrl}
+                        />
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
                           <div className="rounded-full bg-background/90 p-3 shadow-md">
                             <Play className="h-6 w-6 text-foreground" aria-hidden />

@@ -2,6 +2,18 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, requireAuth } from "@/lib/auth";
 
+function firstSceneStillUrl(sceneImagesJson: unknown): string | null {
+  if (!Array.isArray(sceneImagesJson)) return null;
+  for (const item of sceneImagesJson) {
+    if (typeof item === "string" && item.trim().length > 0) return item.trim();
+    if (item && typeof item === "object" && item !== null && "url" in item) {
+      const u = (item as { url: unknown }).url;
+      if (typeof u === "string" && u.trim().length > 0) return u.trim();
+    }
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   const authErr = requireAuth(user);
@@ -30,12 +42,7 @@ export async function GET(request: NextRequest) {
   return Response.json({
     projects: projects.map((p) => {
       const sceneImages = p.storySceneImages as unknown;
-      const previewImageUrl =
-        Array.isArray(sceneImages)
-          ? sceneImages.find(
-              (u): u is string => typeof u === "string" && u.trim().length > 0
-            ) ?? null
-          : null;
+      const previewImageUrl = firstSceneStillUrl(sceneImages);
       return {
         id: p.id,
         storyPrompt: p.storyPrompt,

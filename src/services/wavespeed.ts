@@ -140,20 +140,41 @@ async function wavespeedPoll(
   );
 }
 
+function imageUrlFromOutputItem(item: unknown): string | null {
+  if (typeof item === "string" && item.startsWith("http")) return item;
+  if (item && typeof item === "object" && "url" in item) {
+    const u = (item as { url?: unknown }).url;
+    if (typeof u === "string" && u.startsWith("http")) return u;
+  }
+  return null;
+}
+
+function collectImageUrlsFromArray(arr: unknown[]): string[] {
+  const urls: string[] = [];
+  for (const item of arr) {
+    const u = imageUrlFromOutputItem(item);
+    if (u) urls.push(u);
+  }
+  return urls;
+}
+
 function extractImageUrls(result: Record<string, unknown>): string[] {
   const out = result.output;
+  if (typeof out === "string" && out.startsWith("http")) return [out];
   if (Array.isArray(out)) {
-    return (out as unknown[]).filter((u): u is string => typeof u === "string");
+    const fromArr = collectImageUrlsFromArray(out as unknown[]);
+    if (fromArr.length > 0) return fromArr;
   }
   if (out && typeof out === "object" && "images" in out) {
     const imgs = (out as { images?: unknown }).images;
     if (Array.isArray(imgs)) {
-      return imgs.filter((u): u is string => typeof u === "string");
+      const fromImgs = collectImageUrlsFromArray(imgs);
+      if (fromImgs.length > 0) return fromImgs;
     }
   }
   const outputs = result.outputs;
   if (Array.isArray(outputs)) {
-    return outputs.filter((u): u is string => typeof u === "string");
+    return collectImageUrlsFromArray(outputs);
   }
   return [];
 }
