@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { CreditCard, Globe, KeyRound, Puzzle, Save, Wallet } from "lucide-react";
 
 type SiteSettingRow = {
   id: string;
@@ -17,6 +25,171 @@ type SiteSettingRow = {
   description: string | null;
   updatedAt: string;
 };
+
+type FieldKind = "text" | "boolean" | "number" | "secret";
+
+type FieldMeta = {
+  section: SectionId;
+  label: string;
+  hint?: string;
+  kind: FieldKind;
+};
+
+const SECTION_ORDER = [
+  "site",
+  "billing",
+  "stripe",
+  "integrations",
+  "other",
+] as const;
+
+type SectionId = (typeof SECTION_ORDER)[number];
+
+type SectionDef = {
+  id: SectionId;
+  title: string;
+  blurb: string;
+  icon: LucideIcon;
+};
+
+const SECTIONS: SectionDef[] = [
+  {
+    id: "site",
+    title: "Site & contact",
+    blurb: "What visitors see for your app name and support contact.",
+    icon: Globe,
+  },
+  {
+    id: "billing",
+    title: "Plans & prices",
+    blurb: "Defaults when someone signs up and how plan prices are labeled.",
+    icon: Wallet,
+  },
+  {
+    id: "stripe",
+    title: "Stripe payments",
+    blurb: "Turn on paid plans and paste the keys from your Stripe dashboard.",
+    icon: CreditCard,
+  },
+  {
+    id: "integrations",
+    title: "AI keys",
+    blurb: "Keys for writing stories, voices, images, and video. You can change them anytime.",
+    icon: KeyRound,
+  },
+  {
+    id: "other",
+    title: "Other",
+    blurb: "Extra options stored in the database. Only change these if you know what they do.",
+    icon: Puzzle,
+  },
+];
+
+/** Known keys: friendly copy and grouping. Unknown keys land in “Other”. */
+const FIELD_META: Record<string, FieldMeta> = {
+  "site.name": {
+    section: "site",
+    label: "Site name",
+    hint: "Shown around the app and in messages to users.",
+    kind: "text",
+  },
+  "site.support_email": {
+    section: "site",
+    label: "Support email",
+    hint: "Where users can reach you for help.",
+    kind: "text",
+  },
+  "billing.default_plan_slug": {
+    section: "billing",
+    label: "Starting plan",
+    hint: "Plan code for new accounts (often free). Must match a plan in Admin → Plans.",
+    kind: "text",
+  },
+  "billing.currency": {
+    section: "billing",
+    label: "Currency code",
+    hint: "Three letters, e.g. USD or EUR, for how prices are shown.",
+    kind: "text",
+  },
+  "billing.stripe.enabled": {
+    section: "stripe",
+    label: "Accept payments with Stripe",
+    hint: "When on, customers can subscribe and manage cards in Stripe Checkout.",
+    kind: "boolean",
+  },
+  "billing.stripe.publishable_key": {
+    section: "stripe",
+    label: "Publishable key",
+    hint: "Starts with pk_live_ or pk_test_. Safe to use in the browser.",
+    kind: "text",
+  },
+  "billing.stripe.secret_key": {
+    section: "stripe",
+    label: "Secret key",
+    hint: "Starts with sk_live_ or sk_test_. Keep private—only used on the server.",
+    kind: "secret",
+  },
+  "billing.stripe.webhook_secret": {
+    section: "stripe",
+    label: "Webhook signing secret",
+    hint: "From Stripe → Developers → Webhooks. Lets the site trust payment events.",
+    kind: "secret",
+  },
+  "billing.stripe.checkout_success_url": {
+    section: "stripe",
+    label: "After successful checkout",
+    hint: "Page to open when payment succeeds. Can be a path like /plans?paid=1.",
+    kind: "text",
+  },
+  "billing.stripe.checkout_cancel_url": {
+    section: "stripe",
+    label: "If checkout is cancelled",
+    hint: "Page to open if the customer closes checkout without paying.",
+    kind: "text",
+  },
+  "billing.stripe.portal_return_url": {
+    section: "stripe",
+    label: "After billing portal",
+    hint: "Where to send people when they leave Stripe’s “manage subscription” page.",
+    kind: "text",
+  },
+  "billing.stripe.trial_days": {
+    section: "stripe",
+    label: "Free trial length (days)",
+    hint: "Number of trial days for new subscriptions. Use 0 for no trial.",
+    kind: "number",
+  },
+  "billing.stripe.allow_promotion_codes": {
+    section: "stripe",
+    label: "Allow discount codes",
+    hint: "Lets customers enter a Stripe promotion or coupon code at checkout.",
+    kind: "boolean",
+  },
+  "integrations.openai.api_key": {
+    section: "integrations",
+    label: "OpenAI",
+    hint: "Powers story scripts. If empty, the server can use an environment variable instead.",
+    kind: "secret",
+  },
+  "integrations.wavespeed.api_key": {
+    section: "integrations",
+    label: "WaveSpeed",
+    hint: "Powers voices, images, and short videos. If empty, the server can use an environment variable instead.",
+    kind: "secret",
+  },
+};
+
+const STRIPE_FIELD_ORDER: string[] = [
+  "billing.stripe.enabled",
+  "billing.stripe.publishable_key",
+  "billing.stripe.secret_key",
+  "billing.stripe.webhook_secret",
+  "billing.stripe.checkout_success_url",
+  "billing.stripe.checkout_cancel_url",
+  "billing.stripe.portal_return_url",
+  "billing.stripe.trial_days",
+  "billing.stripe.allow_promotion_codes",
+];
 
 function valueToString(value: unknown): string {
   if (typeof value === "string") return value;
@@ -42,9 +215,38 @@ function parseValue(text: string): unknown {
   return t;
 }
 
+function isSecretKey(key: string): boolean {
+  return /secret_key$|webhook_secret$|api_key$/i.test(key);
+}
+
+function fallbackMeta(key: string): FieldMeta {
+  const tail = key.split(".").pop() ?? key;
+  const words = tail.replace(/_/g, " ");
+  const label = words.charAt(0).toUpperCase() + words.slice(1);
+  return {
+    section: "other",
+    label,
+    hint: "Custom or legacy setting.",
+    kind: isSecretKey(key) ? "secret" : "text",
+  };
+}
+
+function metaForKey(key: string): FieldMeta {
+  return FIELD_META[key] ?? fallbackMeta(key);
+}
+
+function sortRowsInSection(section: SectionId, rows: SiteSettingRow[]): SiteSettingRow[] {
+  if (section === "stripe") {
+    const rank = new Map(STRIPE_FIELD_ORDER.map((k, i) => [k, i]));
+    return [...rows].sort(
+      (a, b) => (rank.get(a.key) ?? 999) - (rank.get(b.key) ?? 999)
+    );
+  }
+  return [...rows].sort((a, b) => a.key.localeCompare(b.key));
+}
+
 export default function AdminSettingsPage() {
   const queryClient = useQueryClient();
-  /** Local edits only; baseline comes from the query. */
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
 
@@ -53,11 +255,26 @@ export default function AdminSettingsPage() {
     queryFn: () => apiRequest<{ settings: SiteSettingRow[] }>("/api/admin/settings"),
   });
 
+  const rows = data?.settings ?? [];
+
+  const grouped = useMemo(() => {
+    const map = new Map<SectionId, SiteSettingRow[]>();
+    for (const id of SECTION_ORDER) map.set(id, []);
+    for (const row of rows) {
+      const section = metaForKey(row.key).section;
+      map.get(section)!.push(row);
+    }
+    const out = new Map<SectionId, SiteSettingRow[]>();
+    for (const id of SECTION_ORDER) {
+      const list = map.get(id) ?? [];
+      if (list.length > 0) out.set(id, sortRowsInSection(id, list));
+    }
+    return out;
+  }, [rows]);
+
   function displayFor(s: SiteSettingRow): string {
     return overrides[s.key] !== undefined ? overrides[s.key]! : valueToString(s.value);
   }
-
-  const rows = data?.settings ?? [];
 
   const saveMutation = useMutation({
     mutationFn: (settings: Record<string, unknown>) =>
@@ -74,17 +291,13 @@ export default function AdminSettingsPage() {
         }
         return next;
       });
-      toast.success("Settings saved");
+      toast.success("Saved");
     },
     onError: (err: { error?: string }) => toast.error(err?.error || "Save failed"),
   });
 
   function updateDraft(key: string, text: string) {
     setOverrides((d) => ({ ...d, [key]: text }));
-  }
-
-  function isSecretSetting(key: string) {
-    return /secret_key$|webhook_secret$|api_key$/i.test(key);
   }
 
   function saveKey(key: string) {
@@ -95,24 +308,23 @@ export default function AdminSettingsPage() {
       const parsed = parseValue(raw);
       saveMutation.mutate({ [key]: parsed });
     } catch {
-      toast.error("Invalid JSON for this value");
+      toast.error("That value doesn’t look valid. Check numbers or spelling.");
     }
   }
 
   function saveAll() {
     const settings: Record<string, unknown> = {};
     try {
-      for (const s of data?.settings ?? []) {
-        const raw = displayFor(s);
-        settings[s.key] = parseValue(raw);
+      for (const s of rows) {
+        settings[s.key] = parseValue(displayFor(s));
       }
       if (Object.keys(settings).length === 0) {
-        toast.message("Nothing to save");
+        toast.message("Nothing to save yet");
         return;
       }
       saveMutation.mutate(settings);
     } catch {
-      toast.error("Invalid value in one of the fields");
+      toast.error("One of the fields has an invalid value");
     }
   }
 
@@ -121,89 +333,148 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground max-w-xl">
-          Key/value settings stored in PostgreSQL. Use plain text, numbers, or JSON
-          objects/arrays. Secret-like keys are blocked from the API.
-        </p>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="space-y-1 max-w-xl">
+          <h2 className="text-lg font-semibold tracking-tight">Site settings</h2>
+          <p className="text-sm text-muted-foreground">
+            Update your site, billing, Stripe, and AI keys in plain language. Use{" "}
+            <span className="font-medium text-foreground">Save</span> on a row to update
+            just that item, or save everything at once.
+          </p>
+        </div>
         <Button
           onClick={saveAll}
-          disabled={saveMutation.isPending}
-          className="gap-2 shrink-0"
+          disabled={saveMutation.isPending || rows.length === 0}
+          className="gap-2 shrink-0 w-full sm:w-auto"
         >
           <Save className="size-4" />
-          Save all
+          Save all changes
         </Button>
       </div>
 
-      <Card className="border-border/60">
-        <CardHeader>
-          <CardTitle>Site settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          {rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No settings yet.</p>
-          ) : (
-            rows.map((s, idx) => {
-              const currPrefix = s.key.split(".")[0] ?? "other";
-              const prevPrefix = rows[idx - 1]?.key.split(".")[0] ?? null;
-              const showGroupHeader = idx === 0 || currPrefix !== prevPrefix;
-              const isSecret = isSecretSetting(s.key);
-              const visible = !!showSecrets[s.key];
-
-              return (
-                <div key={s.id} className="space-y-3">
-                  {showGroupHeader ? (
-                    <div className="pt-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {currPrefix}
-                      </p>
-                    </div>
-                  ) : null}
-                  <div className="grid gap-3 pb-8 border-b border-border/40 last:border-0 last:pb-0">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <Label className="text-base font-mono">{s.key}</Label>
-                      {s.description && (
-                        <p className="text-xs text-muted-foreground">{s.description}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        type={isSecret && !visible ? "password" : "text"}
-                        className="font-mono text-sm border-2 border-muted-foreground/35 bg-background shadow-sm hover:border-muted-foreground/50 focus-visible:border-ring"
-                        value={displayFor(s)}
-                        onChange={(e) => updateDraft(s.key, e.target.value)}
-                      />
-                      {isSecret ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() =>
-                            setShowSecrets((prev) => ({ ...prev, [s.key]: !prev[s.key] }))
-                          }
-                        >
-                          {visible ? "Hide" : "Show"}
-                        </Button>
-                      ) : null}
-                    </div>
-                    <div className="flex justify-end">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => saveKey(s.key)}
-                        disabled={saveMutation.isPending}
-                      >
-                        Save
-                      </Button>
-                    </div>
+      {rows.length === 0 ? (
+        <Card className="border-border/60">
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">No settings found yet.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        SECTIONS.filter((s) => grouped.has(s.id)).map((section) => {
+          const sectionRows = grouped.get(section.id)!;
+          const Icon = section.icon;
+          return (
+            <Card key={section.id} className="border-border/60 overflow-hidden">
+              <CardHeader className="border-b border-border/40 bg-muted/20">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border/60">
+                    <Icon className="size-4 text-muted-foreground" aria-hidden />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <CardTitle className="text-base">{section.title}</CardTitle>
+                    <CardDescription>{section.blurb}</CardDescription>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </CardContent>
-      </Card>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-5">
+                {sectionRows.map((row) => {
+                  const meta = metaForKey(row.key);
+                  const isSecret = meta.kind === "secret" || isSecretKey(row.key);
+                  const visible = !!showSecrets[row.key];
+                  const draft = displayFor(row);
+                  const showInternalId = section.id === "other";
+
+                  return (
+                    <div
+                      key={row.id}
+                      className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm space-y-3"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div className="min-w-0 space-y-1 flex-1">
+                          <Label htmlFor={`setting-${row.id}`} className="text-base font-medium">
+                            {meta.label}
+                          </Label>
+                          {meta.hint ? (
+                            <p className="text-sm text-muted-foreground leading-snug">
+                              {meta.hint}
+                            </p>
+                          ) : null}
+                          {showInternalId ? (
+                            <p className="text-xs font-mono text-muted-foreground/80 pt-1 break-all">
+                              {row.key}
+                            </p>
+                          ) : null}
+                        </div>
+                        {meta.kind === "boolean" ? (
+                          <div className="flex shrink-0 items-center gap-2 sm:pt-0.5">
+                            <span className="text-sm text-muted-foreground sm:sr-only">
+                              {draft === "true" ? "On" : "Off"}
+                            </span>
+                            <Switch
+                              id={`setting-${row.id}`}
+                              checked={draft === "true"}
+                              onCheckedChange={(on) =>
+                                updateDraft(row.key, on ? "true" : "false")
+                              }
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {meta.kind !== "boolean" ? (
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Input
+                            id={`setting-${row.id}`}
+                            type={
+                              meta.kind === "number"
+                                ? "number"
+                                : isSecret && !visible
+                                  ? "password"
+                                  : "text"
+                            }
+                            min={meta.kind === "number" ? 0 : undefined}
+                            step={meta.kind === "number" ? 1 : undefined}
+                            className="font-mono text-sm border-2 border-muted-foreground/35 bg-background sm:max-w-xl sm:flex-1 shadow-sm hover:border-muted-foreground/50 focus-visible:border-ring"
+                            value={draft}
+                            onChange={(e) => updateDraft(row.key, e.target.value)}
+                          />
+                          {isSecret ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="shrink-0"
+                              onClick={() =>
+                                setShowSecrets((prev) => ({
+                                  ...prev,
+                                  [row.key]: !prev[row.key],
+                                }))
+                              }
+                            >
+                              {visible ? "Hide" : "Show"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <div className="flex justify-end pt-1">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => saveKey(row.key)}
+                          disabled={saveMutation.isPending}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
     </div>
   );
 }
