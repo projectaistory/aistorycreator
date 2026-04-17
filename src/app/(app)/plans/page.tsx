@@ -1,27 +1,103 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/use-auth";
 import { apiRequest } from "@/lib/api-client";
-import type { BillingPlan } from "@/types";
+import type { BillingPlan, User } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, ExternalLink, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
-const billingPortalUrl = process.env.NEXT_PUBLIC_BILLING_PORTAL_URL ?? "";
+function errMessage(err: unknown, fallback: string) {
+  if (err && typeof err === "object" && "error" in err) {
+    const m = (err as { error?: string }).error;
+    if (typeof m === "string" && m) return m;
+  }
+  return fallback;
+}
 
 export default function PlansPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [annual, setAnnual] = useState(false);
+  const [planLoadingId, setPlanLoadingId] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["public-plans"],
     queryFn: () => apiRequest<BillingPlan[]>("/api/plans"),
   });
+  const { data: billingConfig } = useQuery({
+    queryKey: ["billing-config"],
+    queryFn: () => apiRequest<{ enabled: boolean; publishableKey: string }>("/api/billing/config"),
+  });
+
+  const billingEnabled = !!billingConfig?.enabled;
+  const hasActiveSubscription =
+    !!user?.stripeSubscriptionId &&
+    !!user?.stripeSubscriptionStatus &&
+    !["canceled", "incomplete_expired"].includes(user.stripeSubscriptionStatus);
+
+  async function openPortal() {
+    setPortalLoading(true);
+    try {
+      const res = await apiRequest<{ url: string }>("/api/billing/portal", { method: "POST" });
+      window.location.href = res.url;
+    } catch (err) {
+      toast.error(errMessage(err, "Could not open billing portal"));
+    } finally {
+      setPortalLoading(false);
+    }
+  }
+
+  async function selectPlan(plan: BillingPlan) {
+    if (user?.planId === plan.id) return;
+    if (!billingEnabled) {
+      toast.error("Billing is currently disabled");
+      return;
+    }
+    const interval = annual ? "year" : "month";
+    const selectedPriceId = annual ? plan.yearlyPriceId : plan.monthlyPriceId;
+    if (!selectedPriceId && plan.monthlyPrice > 0) {
+      toast.error("This plan is missing a Stripe Price ID");
+      return;
+    }
+
+    if (Number(plan.monthlyPrice) === 0) {
+      setPlanLoadingId(plan.id);
+      try {
+        const res = await apiRequest<{ user: User }>("/api/account/plan", {
+          method: "PATCH",
+          body: JSON.stringify({ planId: plan.id }),
+        });
+        queryClient.setQueryData(["auth-user"], res.user);
+        toast.success("Plan updated");
+      } catch (err) {
+        toast.error(errMessage(err, "Could not update plan"));
+      } finally {
+        setPlanLoadingId(null);
+      }
+      return;
+    }
+
+    setPlanLoadingId(plan.id);
+    try {
+      const res = await apiRequest<{ url: string }>("/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ planId: plan.id, interval }),
+      });
+      window.location.href = res.url;
+    } catch (err) {
+      toast.error(errMessage(err, "Could not start checkout"));
+    } finally {
+      setPlanLoadingId(null);
+    }
+  }
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -37,7 +113,7 @@ export default function PlansPage() {
         </p>
       </div>
 
-      {billingPortalUrl ? (
+      {hasActiveSubscription ? (
         <Card className="border-dashed">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Payment &amp; invoices</CardTitle>
@@ -46,15 +122,18 @@ export default function PlansPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <a
-              href={billingPortalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(buttonVariants({ variant: "outline" }), "gap-2 inline-flex w-fit")}
+            <button
+              type="button"
+              onClick={openPortal}
+              disabled={portalLoading}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "gap-2 inline-flex w-fit"
+              )}
             >
               <ExternalLink className="h-4 w-4" />
-              Open billing portal
-            </a>
+              {portalLoading ? "Opening..." : "Open billing portal"}
+            </button>
           </CardContent>
         </Card>
       ) : null}
@@ -120,6 +199,11 @@ export default function PlansPage() {
                   const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
                   const period = annual ? "/yr" : "/mo";
                   const isCurrent = user?.planId === plan.id;
+                  const currentPlan = plans.find((p) => p.id === user?.planId);
+                  const selectedPriceId = annual ? plan.yearlyPriceId : plan.monthlyPriceId;
+                  const canDowngrade = !!currentPlan && plan.monthlyPrice < currentPlan.monthlyPrice;
+                  const canCheckout = billingEnabled && (price === 0 || !!selectedPriceId);
+                  const loading = planLoadingId === plan.id;
 
                   return (
                     <div
@@ -164,16 +248,29 @@ export default function PlansPage() {
                       <Separator className="opacity-50" />
                       <Button
                         type="button"
-                        variant={isCurrent ? "secondary" : "outline"}
+                        variant={isCurrent ? "secondary" : canDowngrade ? "default" : "outline"}
                         className="w-full"
-                        disabled
+                        disabled={isCurrent || !canCheckout || loading}
+                        onClick={() => selectPlan(plan)}
                         title={
                           isCurrent
                             ? "Your current plan"
-                            : "Plan upgrades are not available yet"
+                            : !billingEnabled
+                              ? "Stripe billing is currently disabled"
+                              : !selectedPriceId && price > 0
+                                ? "Stripe Price ID missing for this interval"
+                                : canDowngrade
+                                  ? "Switch to this lower-priced plan"
+                                  : "Continue to Stripe checkout"
                         }
                       >
-                        {isCurrent ? "Active plan" : "Unavailable"}
+                        {loading
+                          ? "Redirecting..."
+                          : isCurrent
+                            ? "Active plan"
+                            : price === 0
+                              ? "Switch to free"
+                              : "Checkout"}
                       </Button>
                     </div>
                   );

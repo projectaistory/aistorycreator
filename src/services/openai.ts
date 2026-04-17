@@ -4,8 +4,22 @@ import {
   finalizeScenesAfterGeneration,
   type StorySceneGenerationRaw,
 } from "@/lib/storyTtsVoices";
+import { getOpenAiApiKey } from "@/lib/site-settings";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+/**
+ * Build a per-request OpenAI client so the key can be rotated from the admin
+ * dashboard without a redeploy. {@link getOpenAiApiKey} prefers the DB-stored
+ * setting and falls back to the legacy OPENAI_API_KEY env var.
+ */
+async function getOpenAI(): Promise<OpenAI> {
+  const apiKey = await getOpenAiApiKey();
+  if (!apiKey) {
+    throw new Error(
+      "OpenAI API key is not configured. Set integrations.openai.api_key in the admin dashboard or OPENAI_API_KEY in the environment."
+    );
+  }
+  return new OpenAI({ apiKey });
+}
 
 export async function generateStoryScript(
   storyPrompt: string,
@@ -57,6 +71,7 @@ Return JSON in this exact shape:
   ]
 }`;
 
+  const openai = await getOpenAI();
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [

@@ -46,6 +46,7 @@ export default function AdminSettingsPage() {
   const queryClient = useQueryClient();
   /** Local edits only; baseline comes from the query. */
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-settings"],
@@ -80,6 +81,10 @@ export default function AdminSettingsPage() {
 
   function updateDraft(key: string, text: string) {
     setOverrides((d) => ({ ...d, [key]: text }));
+  }
+
+  function isSecretSetting(key: string) {
+    return /secret_key$|webhook_secret$|api_key$/i.test(key);
   }
 
   function saveKey(key: string) {
@@ -140,34 +145,62 @@ export default function AdminSettingsPage() {
           {rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">No settings yet.</p>
           ) : (
-            rows.map((s) => (
-              <div
-                key={s.id}
-                className="grid gap-3 pb-8 border-b border-border/40 last:border-0 last:pb-0"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <Label className="text-base font-mono">{s.key}</Label>
-                  {s.description && (
-                    <p className="text-xs text-muted-foreground">{s.description}</p>
-                  )}
+            rows.map((s, idx) => {
+              const currPrefix = s.key.split(".")[0] ?? "other";
+              const prevPrefix = rows[idx - 1]?.key.split(".")[0] ?? null;
+              const showGroupHeader = idx === 0 || currPrefix !== prevPrefix;
+              const isSecret = isSecretSetting(s.key);
+              const visible = !!showSecrets[s.key];
+
+              return (
+                <div key={s.id} className="space-y-3">
+                  {showGroupHeader ? (
+                    <div className="pt-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {currPrefix}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="grid gap-3 pb-8 border-b border-border/40 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <Label className="text-base font-mono">{s.key}</Label>
+                      {s.description && (
+                        <p className="text-xs text-muted-foreground">{s.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type={isSecret && !visible ? "password" : "text"}
+                        className="font-mono text-sm"
+                        value={displayFor(s)}
+                        onChange={(e) => updateDraft(s.key, e.target.value)}
+                      />
+                      {isSecret ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            setShowSecrets((prev) => ({ ...prev, [s.key]: !prev[s.key] }))
+                          }
+                        >
+                          {visible ? "Hide" : "Show"}
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => saveKey(s.key)}
+                        disabled={saveMutation.isPending}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <Input
-                  className="font-mono text-sm"
-                  value={displayFor(s)}
-                  onChange={(e) => updateDraft(s.key, e.target.value)}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => saveKey(s.key)}
-                    disabled={saveMutation.isPending}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </CardContent>
       </Card>

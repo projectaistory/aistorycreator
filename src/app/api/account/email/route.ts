@@ -11,6 +11,11 @@ const userSelect = {
   credits: true,
   role: true,
   planId: true,
+  stripeCustomerId: true,
+  stripeSubscriptionId: true,
+  stripeSubscriptionStatus: true,
+  stripePriceId: true,
+  stripeCurrentPeriodEnd: true,
   createdAt: true,
   plan: { select: { id: true, name: true, slug: true } },
 } as const;

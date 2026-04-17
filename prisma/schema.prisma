@@ -19,6 +19,8 @@ model Plan {
   features         Json     @default("[]")
   monthlyPrice     Decimal  @db.Decimal(10, 2)
   yearlyPrice      Decimal  @db.Decimal(10, 2)
+  monthlyPriceId   String?
+  yearlyPriceId    String?
   includedCredits  Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -37,17 +39,22 @@ model SiteSetting {
 }
 
 model User {
-  id         String      @id @default(uuid())
-  email      String      @unique
-  password   String
-  name       String
-  credits    Int         @default(10000)
-  role       UserRole    @default(USER)
-  planId     String?
-  plan       Plan?       @relation(fields: [planId], references: [id], onDelete: SetNull)
-  createdAt  DateTime    @default(now())
-  characters Character[]
-  projects   Project[]
+  id                       String      @id @default(uuid())
+  email                    String      @unique
+  password                 String
+  name                     String
+  credits                  Int         @default(10000)
+  role                     UserRole    @default(USER)
+  planId                   String?
+  stripeCustomerId         String?     @unique
+  stripeSubscriptionId     String?     @unique
+  stripeSubscriptionStatus String?
+  stripePriceId            String?
+  stripeCurrentPeriodEnd   DateTime?
+  plan                     Plan?       @relation(fields: [planId], references: [id], onDelete: SetNull)
+  createdAt                DateTime    @default(now())
+  characters               Character[]
+  projects                 Project[]
 
   @@index([planId])
 }

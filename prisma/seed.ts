@@ -14,6 +14,8 @@ const PLANS = [
     ],
     monthlyPrice: 0,
     yearlyPrice: 0,
+    monthlyPriceId: null,
+    yearlyPriceId: null,
     includedCredits: 2_000,
   },
   {
@@ -27,6 +29,8 @@ const PLANS = [
     ],
     monthlyPrice: 9.99,
     yearlyPrice: 99,
+    monthlyPriceId: null,
+    yearlyPriceId: null,
     includedCredits: 20_000,
   },
   {
@@ -41,6 +45,8 @@ const PLANS = [
     ],
     monthlyPrice: 29.99,
     yearlyPrice: 299,
+    monthlyPriceId: null,
+    yearlyPriceId: null,
     includedCredits: 80_000,
   },
 ] as const;
@@ -70,6 +76,63 @@ const SITE_SETTINGS: {
     value: "USD",
     description: "Display currency for plans",
   },
+  {
+    key: "billing.stripe.enabled",
+    value: false,
+    description: "Enable Stripe-hosted checkout for subscriptions",
+  },
+  {
+    key: "billing.stripe.publishable_key",
+    value: "",
+    description: "Stripe publishable key used by frontend clients",
+  },
+  {
+    key: "billing.stripe.secret_key",
+    value: "",
+    description: "Stripe secret key used by server APIs",
+  },
+  {
+    key: "billing.stripe.webhook_secret",
+    value: "",
+    description: "Stripe webhook signing secret for event verification",
+  },
+  {
+    key: "billing.stripe.checkout_success_url",
+    value: "/plans?status=success",
+    description: "Relative or absolute checkout success return URL",
+  },
+  {
+    key: "billing.stripe.checkout_cancel_url",
+    value: "/plans?status=cancelled",
+    description: "Relative or absolute checkout cancel return URL",
+  },
+  {
+    key: "billing.stripe.portal_return_url",
+    value: "/profile",
+    description: "Return destination after Stripe customer portal",
+  },
+  {
+    key: "billing.stripe.trial_days",
+    value: 0,
+    description: "Default trial days for new subscription checkout sessions",
+  },
+  {
+    key: "billing.stripe.allow_promotion_codes",
+    value: true,
+    description: "Allow Stripe promotion code entry on checkout",
+  },
+  {
+    key: "integrations.openai.api_key",
+    value: "",
+    description:
+      "OpenAI API key used for story script generation. Falls back to OPENAI_API_KEY env var when empty.",
+  },
+  {
+    key: "integrations.wavespeed.api_key",
+    value: "",
+    description:
+      "WaveSpeed API key used for TTS, scene images, and video generation. Falls back to WAVESPEED_API_KEY env var when empty.",
+  },
 ];
 
 async function main() {
@@ -82,6 +145,8 @@ async function main() {
         features: [...p.features],
         monthlyPrice: p.monthlyPrice,
         yearlyPrice: p.yearlyPrice,
+        monthlyPriceId: p.monthlyPriceId,
+        yearlyPriceId: p.yearlyPriceId,
         includedCredits: p.includedCredits,
       },
       update: {
@@ -89,6 +154,8 @@ async function main() {
         features: [...p.features],
         monthlyPrice: p.monthlyPrice,
         yearlyPrice: p.yearlyPrice,
+        monthlyPriceId: p.monthlyPriceId,
+        yearlyPriceId: p.yearlyPriceId,
         includedCredits: p.includedCredits,
       },
     });

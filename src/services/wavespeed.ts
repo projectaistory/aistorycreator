@@ -1,5 +1,6 @@
 import { Agent, fetch as undiciFetch } from "undici";
 import { coerceInworldMiniVoiceId } from "@/lib/constants";
+import { getWaveSpeedApiKey } from "@/lib/site-settings";
 
 const WAVESPEED_BASE = "https://api.wavespeed.ai/api/v3";
 
@@ -33,22 +34,28 @@ function toWavespeedSize(wxh: string): string {
     : wxh.replace(/x/gi, "*");
 }
 
-function getApiKey() {
-  const key = process.env.WAVESPEED_API_KEY?.trim();
+/**
+ * Resolve the WaveSpeed API key per request so admins can rotate it from the
+ * dashboard. {@link getWaveSpeedApiKey} reads the DB setting first and falls
+ * back to the legacy WAVESPEED_API_KEY env var.
+ */
+async function getApiKey(): Promise<string> {
+  const key = (await getWaveSpeedApiKey()).trim();
   if (!key) {
     throw new Error(
-      "WAVESPEED_API_KEY is missing or empty. If it is set in .env, remove any empty WAVESPEED_API_KEY line from .env.local (Next.js gives .env.local priority)."
+      "WaveSpeed API key is not configured. Set integrations.wavespeed.api_key in the admin dashboard or WAVESPEED_API_KEY in the environment."
     );
   }
   return key;
 }
 
 async function wavespeedPost(endpoint: string, body: Record<string, unknown>) {
+  const apiKey = await getApiKey();
   const res = await wavespeedFetch(`${WAVESPEED_BASE}${endpoint}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getApiKey()}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });
@@ -76,6 +83,7 @@ async function wavespeedPoll(
   intervalMs: number = 5000,
   maxAttempts: number = 120
 ): Promise<Record<string, unknown>> {
+  const apiKey = await getApiKey();
   for (let i = 0; i < maxAttempts; i++) {
     if (i > 0) {
       await new Promise((r) => setTimeout(r, intervalMs));
@@ -85,7 +93,7 @@ async function wavespeedPoll(
     try {
       res = await wavespeedFetch(
         `${WAVESPEED_BASE}/predictions/${predictionId}/result`,
-        { headers: { Authorization: `Bearer ${getApiKey()}` } }
+        { headers: { Authorization: `Bearer ${apiKey}` } }
       );
     } catch (err) {
       console.warn(

@@ -32,6 +32,8 @@ export async function PATCH(
     monthlyPrice?: number;
     yearlyPrice?: number;
     includedCredits?: number;
+    monthlyPriceId?: string | null;
+    yearlyPriceId?: string | null;
   } = {};
 
   if (typeof body.name === "string" && body.name.trim()) {
@@ -71,6 +73,20 @@ export async function PATCH(
       );
     }
     data.includedCredits = body.includedCredits;
+  }
+  if (body.monthlyPriceId !== undefined) {
+    if (typeof body.monthlyPriceId !== "string") {
+      return Response.json({ error: "monthlyPriceId must be a string" }, { status: 400 });
+    }
+    const trimmed = body.monthlyPriceId.trim();
+    data.monthlyPriceId = trimmed || null;
+  }
+  if (body.yearlyPriceId !== undefined) {
+    if (typeof body.yearlyPriceId !== "string") {
+      return Response.json({ error: "yearlyPriceId must be a string" }, { status: 400 });
+    }
+    const trimmed = body.yearlyPriceId.trim();
+    data.yearlyPriceId = trimmed || null;
   }
 
   if (Object.keys(data).length === 0) {

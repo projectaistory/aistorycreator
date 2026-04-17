@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
     monthlyPrice?: unknown;
     yearlyPrice?: unknown;
     includedCredits?: unknown;
+    monthlyPriceId?: unknown;
+    yearlyPriceId?: unknown;
   };
   try {
     body = await request.json();
@@ -76,6 +78,17 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "features must be an array" }, { status: 400 });
   }
 
+  const monthlyPriceId =
+    typeof body.monthlyPriceId === "string" ? body.monthlyPriceId.trim() : "";
+  const yearlyPriceId =
+    typeof body.yearlyPriceId === "string" ? body.yearlyPriceId.trim() : "";
+  if (body.monthlyPriceId !== undefined && typeof body.monthlyPriceId !== "string") {
+    return Response.json({ error: "monthlyPriceId must be a string" }, { status: 400 });
+  }
+  if (body.yearlyPriceId !== undefined && typeof body.yearlyPriceId !== "string") {
+    return Response.json({ error: "yearlyPriceId must be a string" }, { status: 400 });
+  }
+
   try {
     const plan = await prisma.plan.create({
       data: {
@@ -84,6 +97,8 @@ export async function POST(request: NextRequest) {
         features,
         monthlyPrice: monthly,
         yearlyPrice: yearly,
+        monthlyPriceId: monthlyPriceId || null,
+        yearlyPriceId: yearlyPriceId || null,
         includedCredits,
       },
     });

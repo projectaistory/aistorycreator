@@ -5,9 +5,20 @@ import { prisma } from "@/lib/prisma";
 
 /** Keys we allow storing via admin UI (no raw integration secrets). */
 const BLOCKED_KEY_SUBSTRINGS = ["secret", "api_key", "apikey", "password", "token"];
+/**
+ * Explicit allowlist of secret-like keys that admins are expected to manage
+ * from the dashboard (overrides {@link BLOCKED_KEY_SUBSTRINGS}).
+ */
+const ALLOWED_SECRET_KEYS = new Set([
+  "billing.stripe.secret_key",
+  "billing.stripe.webhook_secret",
+  "integrations.openai.api_key",
+  "integrations.wavespeed.api_key",
+]);
 
 function isBlockedKey(key: string): boolean {
   const lower = key.toLowerCase();
+  if (ALLOWED_SECRET_KEYS.has(lower)) return false;
   return BLOCKED_KEY_SUBSTRINGS.some((s) => lower.includes(s));
 }
 

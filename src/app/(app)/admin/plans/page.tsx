@@ -25,6 +25,8 @@ type AdminPlan = {
   features: unknown;
   monthlyPrice: number;
   yearlyPrice: number;
+  monthlyPriceId: string | null;
+  yearlyPriceId: string | null;
   includedCredits: number;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +53,8 @@ export default function AdminPlansPage() {
     slug: "",
     monthlyPrice: 0,
     yearlyPrice: 0,
+    monthlyPriceId: "",
+    yearlyPriceId: "",
     includedCredits: 0,
     featureLines: "",
   });
@@ -105,6 +109,8 @@ export default function AdminPlansPage() {
       slug: "",
       monthlyPrice: 0,
       yearlyPrice: 0,
+      monthlyPriceId: "",
+      yearlyPriceId: "",
       includedCredits: 0,
       featureLines: "",
     });
@@ -117,6 +123,8 @@ export default function AdminPlansPage() {
       slug: p.slug,
       monthlyPrice: p.monthlyPrice,
       yearlyPrice: p.yearlyPrice,
+      monthlyPriceId: p.monthlyPriceId ?? "",
+      yearlyPriceId: p.yearlyPriceId ?? "",
       includedCredits: p.includedCredits ?? 0,
       featureLines: featuresToLines(p.features),
     });
@@ -136,6 +144,8 @@ export default function AdminPlansPage() {
         slug: form.slug,
         monthlyPrice: form.monthlyPrice,
         yearlyPrice: form.yearlyPrice,
+        monthlyPriceId: form.monthlyPriceId.trim() || null,
+        yearlyPriceId: form.yearlyPriceId.trim() || null,
         includedCredits: form.includedCredits,
         features: linesToFeatures(form.featureLines),
       },
@@ -148,6 +158,8 @@ export default function AdminPlansPage() {
       slug: form.slug,
       monthlyPrice: form.monthlyPrice,
       yearlyPrice: form.yearlyPrice,
+      monthlyPriceId: form.monthlyPriceId.trim() || null,
+      yearlyPriceId: form.yearlyPriceId.trim() || null,
       includedCredits: form.includedCredits,
       features: linesToFeatures(form.featureLines),
     });
@@ -250,6 +262,10 @@ export default function AdminPlansPage() {
                     ))
                   )}
                 </ul>
+                <div className="space-y-1 text-xs font-mono text-muted-foreground">
+                  <p>Monthly Price ID: {p.monthlyPriceId || "not set"}</p>
+                  <p>Yearly Price ID: {p.yearlyPriceId || "not set"}</p>
+                </div>
               </CardContent>
             </Card>
           );
@@ -302,6 +318,8 @@ function PlanFormFields({
     slug: string;
     monthlyPrice: number;
     yearlyPrice: number;
+    monthlyPriceId: string;
+    yearlyPriceId: string;
     includedCredits: number;
     featureLines: string;
   };
@@ -311,6 +329,8 @@ function PlanFormFields({
       slug: string;
       monthlyPrice: number;
       yearlyPrice: number;
+      monthlyPriceId: string;
+      yearlyPriceId: string;
       includedCredits: number;
       featureLines: string;
     }>
@@ -363,6 +383,28 @@ function PlanFormFields({
             }
           />
         </div>
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="p-monthly-id">Stripe Monthly Price ID</Label>
+        <Input
+          id="p-monthly-id"
+          value={form.monthlyPriceId}
+          placeholder="price_..."
+          onChange={(e) =>
+            setForm((f) => ({ ...f, monthlyPriceId: e.target.value.trim() }))
+          }
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="p-yearly-id">Stripe Yearly Price ID</Label>
+        <Input
+          id="p-yearly-id"
+          value={form.yearlyPriceId}
+          placeholder="price_..."
+          onChange={(e) =>
+            setForm((f) => ({ ...f, yearlyPriceId: e.target.value.trim() }))
+          }
+        />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="p-credits">Credits included</Label>

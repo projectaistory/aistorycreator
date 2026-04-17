@@ -87,6 +87,11 @@ export interface User {
   credits: number;
   role: UserRole;
   planId: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeSubscriptionStatus: string | null;
+  stripePriceId: string | null;
+  stripeCurrentPeriodEnd: string | null;
   plan: UserPlanSummary | null;
   createdAt: string;
 }
@@ -104,6 +109,8 @@ export interface BillingPlan {
   features: unknown;
   monthlyPrice: number;
   yearlyPrice: number;
+  monthlyPriceId: string | null;
+  yearlyPriceId: string | null;
   includedCredits: number;
   createdAt: string;
   updatedAt: string;
