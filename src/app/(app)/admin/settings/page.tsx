@@ -171,7 +171,7 @@ export default function AdminSettingsPage() {
                     <div className="flex gap-2">
                       <Input
                         type={isSecret && !visible ? "password" : "text"}
-                        className="font-mono text-sm"
+                        className="font-mono text-sm border-2 border-muted-foreground/35 bg-background shadow-sm hover:border-muted-foreground/50 focus-visible:border-ring"
                         value={displayFor(s)}
                         onChange={(e) => updateDraft(s.key, e.target.value)}
                       />

@@ -19,6 +19,13 @@ function subscriptionPriceId(subscription: Stripe.Subscription) {
   return subscription.items.data[0]?.price?.id ?? null;
 }
 
+/** Stripe v22+ types expose billing period on subscription items, not on Subscription. */
+function subscriptionCurrentPeriodEnd(subscription: Stripe.Subscription): Date | null {
+  const endUnix = subscription.items.data[0]?.current_period_end;
+  if (endUnix == null) return null;
+  return new Date(endUnix * 1000);
+}
+
 export async function POST(request: Request) {
   const stripeConfig = await getStripeConfig();
   if (!stripeConfig.webhookSecret) {
@@ -69,9 +76,7 @@ export async function POST(request: Request) {
             stripeSubscriptionId: subscription?.id ?? null,
             stripeSubscriptionStatus: subscription?.status ?? "active",
             stripePriceId: priceId,
-            stripeCurrentPeriodEnd: subscription?.current_period_end
-              ? new Date(subscription.current_period_end * 1000)
-              : null,
+            stripeCurrentPeriodEnd: subscription ? subscriptionCurrentPeriodEnd(subscription) : null,
             planId: matchedPlan?.id ?? user.planId,
             ...(matchedPlan && user.stripeSubscriptionId !== subscription?.id
               ? { credits: { increment: matchedPlan.includedCredits } }
@@ -98,9 +103,7 @@ export async function POST(request: Request) {
             stripeSubscriptionId: sub.id,
             stripeSubscriptionStatus: sub.status,
             stripePriceId: priceId,
-            stripeCurrentPeriodEnd: sub.current_period_end
-              ? new Date(sub.current_period_end * 1000)
-              : null,
+            stripeCurrentPeriodEnd: subscriptionCurrentPeriodEnd(sub),
             planId: shouldFallback ? (freePlan?.id ?? null) : (matchedPlan?.id ?? undefined),
           },
         });
