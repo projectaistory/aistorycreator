@@ -354,7 +354,7 @@ export default function AdminSettingsPage() {
         <Button
           onClick={saveAll}
           disabled={saveMutation.isPending || rows.length === 0}
-          className="gap-2 shrink-0 w-full sm:w-auto"
+          className="gap-2 shrink-0 w-full sm:w-auto border-transparent !bg-purple-600 !text-white hover:!bg-purple-700 focus-visible:ring-purple-500/40 dark:!bg-purple-600 dark:!text-white dark:hover:!bg-purple-700"
         >
           <Save className="size-4" />
           Save all changes
@@ -466,10 +466,10 @@ export default function AdminSettingsPage() {
                       <div className="flex justify-end pt-1">
                         <Button
                           type="button"
-                          variant="secondary"
                           size="sm"
                           onClick={() => saveKey(row.key)}
                           disabled={saveMutation.isPending}
+                          className="border-transparent !bg-purple-600 !text-white hover:!bg-purple-700 focus-visible:ring-purple-500/40 dark:!bg-purple-600 dark:!text-white dark:hover:!bg-purple-700"
                         >
                           Save
                         </Button>
