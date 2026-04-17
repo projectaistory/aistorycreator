@@ -245,10 +245,27 @@ export default function AdminUsersPage() {
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="No plan" />
+                  <SelectValue placeholder="No plan">
+                    {(selected: unknown) => {
+                      const v = typeof selected === "string" ? selected : "";
+                      if (!v || v === "__none__") return "No plan";
+                      const fromList = plans.find((p) => p.id === v);
+                      if (fromList) return fromList.name;
+                      if (editing?.plan?.id === v) return editing.plan.name;
+                      return "Unknown plan";
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">No plan</SelectItem>
+                  {form.planId &&
+                    !plans.some((p) => p.id === form.planId) && (
+                      <SelectItem value={form.planId}>
+                        {editing?.plan?.id === form.planId
+                          ? editing.plan.name
+                          : "Unknown plan"}
+                      </SelectItem>
+                    )}
                   {plans.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}

@@ -135,24 +135,6 @@ const FIELD_META: Record<string, FieldMeta> = {
     hint: "From Stripe → Developers → Webhooks. Lets the site trust payment events.",
     kind: "secret",
   },
-  "billing.stripe.checkout_success_url": {
-    section: "stripe",
-    label: "After successful checkout",
-    hint: "Page to open when payment succeeds. Can be a path like /plans?paid=1.",
-    kind: "text",
-  },
-  "billing.stripe.checkout_cancel_url": {
-    section: "stripe",
-    label: "If checkout is cancelled",
-    hint: "Page to open if the customer closes checkout without paying.",
-    kind: "text",
-  },
-  "billing.stripe.portal_return_url": {
-    section: "stripe",
-    label: "After billing portal",
-    hint: "Where to send people when they leave Stripe’s “manage subscription” page.",
-    kind: "text",
-  },
   "billing.stripe.trial_days": {
     section: "stripe",
     label: "Free trial length (days)",
@@ -179,14 +161,17 @@ const FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+const SETTINGS_HIDDEN_FROM_UI = new Set<string>([
+  "billing.stripe.checkout_success_url",
+  "billing.stripe.checkout_cancel_url",
+  "billing.stripe.portal_return_url",
+]);
+
 const STRIPE_FIELD_ORDER: string[] = [
   "billing.stripe.enabled",
   "billing.stripe.publishable_key",
   "billing.stripe.secret_key",
   "billing.stripe.webhook_secret",
-  "billing.stripe.checkout_success_url",
-  "billing.stripe.checkout_cancel_url",
-  "billing.stripe.portal_return_url",
   "billing.stripe.trial_days",
   "billing.stripe.allow_promotion_codes",
 ];
@@ -256,11 +241,15 @@ export default function AdminSettingsPage() {
   });
 
   const rows = data?.settings ?? [];
+  const visibleRows = useMemo(
+    () => rows.filter((r) => !SETTINGS_HIDDEN_FROM_UI.has(r.key)),
+    [rows]
+  );
 
   const grouped = useMemo(() => {
     const map = new Map<SectionId, SiteSettingRow[]>();
     for (const id of SECTION_ORDER) map.set(id, []);
-    for (const row of rows) {
+    for (const row of visibleRows) {
       const section = metaForKey(row.key).section;
       map.get(section)!.push(row);
     }
@@ -270,7 +259,7 @@ export default function AdminSettingsPage() {
       if (list.length > 0) out.set(id, sortRowsInSection(id, list));
     }
     return out;
-  }, [rows]);
+  }, [visibleRows]);
 
   /** First group starts open so the page isn’t an empty stack of headers. */
   const defaultOpenSections = useMemo((): string[] => {
@@ -309,7 +298,7 @@ export default function AdminSettingsPage() {
   }
 
   function saveKey(key: string) {
-    const row = rows.find((s) => s.key === key);
+    const row = visibleRows.find((s) => s.key === key);
     if (!row) return;
     const raw = displayFor(row);
     try {
@@ -323,7 +312,7 @@ export default function AdminSettingsPage() {
   function saveAll() {
     const settings: Record<string, unknown> = {};
     try {
-      for (const s of rows) {
+      for (const s of visibleRows) {
         settings[s.key] = parseValue(displayFor(s));
       }
       if (Object.keys(settings).length === 0) {
@@ -353,7 +342,7 @@ export default function AdminSettingsPage() {
         </div>
         <Button
           onClick={saveAll}
-          disabled={saveMutation.isPending || rows.length === 0}
+          disabled={saveMutation.isPending || visibleRows.length === 0}
           className="gap-2 shrink-0 w-full sm:w-auto border-transparent !bg-purple-600 !text-white hover:!bg-purple-700 focus-visible:ring-purple-500/40 dark:!bg-purple-600 dark:!text-white dark:hover:!bg-purple-700"
         >
           <Save className="size-4" />
@@ -361,7 +350,7 @@ export default function AdminSettingsPage() {
         </Button>
       </div>
 
-      {rows.length === 0 ? (
+      {visibleRows.length === 0 ? (
         <Card className="border-border/60">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">No settings found yet.</p>
