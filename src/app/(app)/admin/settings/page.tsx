@@ -4,12 +4,12 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api-client";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -272,6 +272,14 @@ export default function AdminSettingsPage() {
     return out;
   }, [rows]);
 
+  /** First group starts open so the page isn’t an empty stack of headers. */
+  const defaultOpenSections = useMemo((): string[] => {
+    for (const id of SECTION_ORDER) {
+      if (grouped.has(id)) return [id];
+    }
+    return [];
+  }, [grouped]);
+
   function displayFor(s: SiteSettingRow): string {
     return overrides[s.key] !== undefined ? overrides[s.key]! : valueToString(s.value);
   }
@@ -360,24 +368,23 @@ export default function AdminSettingsPage() {
           </CardContent>
         </Card>
       ) : (
-        SECTIONS.filter((s) => grouped.has(s.id)).map((section) => {
-          const sectionRows = grouped.get(section.id)!;
-          const Icon = section.icon;
-          return (
-            <Card key={section.id} className="border-border/60 overflow-hidden">
-              <CardHeader className="border-b border-border/40 bg-muted/20">
-                <div className="flex items-start gap-3">
+        <Accordion defaultValue={defaultOpenSections} multiple>
+          {SECTIONS.filter((s) => grouped.has(s.id)).map((section) => {
+            const sectionRows = grouped.get(section.id)!;
+            const Icon = section.icon;
+            return (
+              <AccordionItem key={section.id} value={section.id}>
+                <AccordionTrigger>
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border/60">
                     <Icon className="size-4 text-muted-foreground" aria-hidden />
                   </div>
-                  <div className="min-w-0 space-y-1">
-                    <CardTitle className="text-base">{section.title}</CardTitle>
-                    <CardDescription>{section.blurb}</CardDescription>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-base font-medium leading-snug">{section.title}</p>
+                    <p className="text-sm text-muted-foreground leading-snug">{section.blurb}</p>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-5">
-                {sectionRows.map((row) => {
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4">
+                  {sectionRows.map((row) => {
                   const meta = metaForKey(row.key);
                   const isSecret = meta.kind === "secret" || isSecretKey(row.key);
                   const visible = !!showSecrets[row.key];
@@ -469,11 +476,12 @@ export default function AdminSettingsPage() {
                       </div>
                     </div>
                   );
-                })}
-              </CardContent>
-            </Card>
-          );
-        })
+                  })}
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       )}
     </div>
   );
