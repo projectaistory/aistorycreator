@@ -51,14 +51,11 @@ export async function getStripeConfig(): Promise<StripeConfig> {
   });
   const byKey = new Map(rows.map((r) => [r.key, r.value] as const));
 
-  const dbSecret = readString(byKey.get("billing.stripe.secret_key"), "");
-  const dbWebhookSecret = readString(byKey.get("billing.stripe.webhook_secret"), "");
-
   return {
     enabled: readBoolean(byKey.get("billing.stripe.enabled"), false),
     publishableKey: readString(byKey.get("billing.stripe.publishable_key"), ""),
-    secretKey: dbSecret || process.env.STRIPE_SECRET_KEY || "",
-    webhookSecret: dbWebhookSecret || process.env.STRIPE_WEBHOOK_SECRET || "",
+    secretKey: readString(byKey.get("billing.stripe.secret_key"), ""),
+    webhookSecret: readString(byKey.get("billing.stripe.webhook_secret"), ""),
     checkoutSuccessUrl: readString(
       byKey.get("billing.stripe.checkout_success_url"),
       "/plans?status=success"
