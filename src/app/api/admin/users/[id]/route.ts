@@ -113,3 +113,47 @@ export async function PATCH(
     return Response.json({ error: "Update failed" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const admin = await getAuthUser(request);
+  const err = requireAdmin(admin);
+  if (err) return err;
+  if (!admin) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await ctx.params;
+
+  if (admin.id === id) {
+    return Response.json({ error: "You cannot delete your own account" }, { status: 400 });
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true },
+  });
+  if (!target) {
+    return Response.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (target.role === "ADMIN") {
+    const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+    if (adminCount <= 1) {
+      return Response.json(
+        { error: "Cannot delete the last admin account" },
+        { status: 400 }
+      );
+    }
+  }
+
+  try {
+    await prisma.user.delete({ where: { id } });
+    return Response.json({ ok: true });
+  } catch (e) {
+    console.error("[admin/users/delete]", e);
+    return Response.json({ error: "Delete failed" }, { status: 500 });
+  }
+}

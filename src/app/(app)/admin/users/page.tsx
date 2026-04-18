@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -24,7 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/use-auth";
 
 type AdminUserRow = {
   id: string;
@@ -51,7 +53,9 @@ type AdminPlan = {
 
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
+  const [userToDelete, setUserToDelete] = useState<AdminUserRow | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -87,6 +91,21 @@ export default function AdminUsersPage() {
     },
     onError: (err: { error?: string; status?: number }) => {
       toast.error(err?.error || "Update failed");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest<{ ok: boolean }>(`/api/admin/users/${id}`, { method: "DELETE" }),
+    onSuccess: (_, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      toast.success("User deleted");
+      setUserToDelete(null);
+      if (editing?.id === deletedId) setEditing(null);
+    },
+    onError: (err: { error?: string }) => {
+      toast.error(err?.error || "Delete failed");
     },
   });
 
@@ -136,7 +155,7 @@ export default function AdminUsersPage() {
                   <th className="px-4 py-3 font-medium">Plan</th>
                   <th className="px-4 py-3 font-medium">Credits</th>
                   <th className="px-4 py-3 font-medium">Activity</th>
-                  <th className="px-4 py-3 font-medium w-24" />
+                  <th className="px-4 py-3 font-medium w-28" />
                 </tr>
               </thead>
               <tbody>
@@ -168,15 +187,32 @@ export default function AdminUsersPage() {
                       {u.projectCount} projects · {u.characterCount} characters
                     </td>
                     <td className="px-4 py-3">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(u)}
-                        aria-label={`Edit ${u.name}`}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="h-8 w-8"
+                          onClick={() => openEdit(u)}
+                          aria-label={`Edit ${u.name}`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          disabled={currentUser?.id === u.id || deleteMutation.isPending}
+                          title={
+                            currentUser?.id === u.id
+                              ? "You cannot delete your own account"
+                              : `Delete ${u.name}`
+                          }
+                          onClick={() => setUserToDelete(u)}
+                          aria-label={`Delete ${u.name}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -281,6 +317,34 @@ export default function AdminUsersPage() {
             </Button>
             <Button onClick={saveEdit} disabled={updateMutation.isPending}>
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!userToDelete} onOpenChange={(o) => !o && setUserToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete user</DialogTitle>
+            <DialogDescription>
+              This permanently removes{" "}
+              <span className="font-medium text-foreground">{userToDelete?.name}</span> (
+              {userToDelete?.email}) and all of their projects and characters. This cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUserToDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (userToDelete) deleteMutation.mutate(userToDelete.id);
+              }}
+            >
+              Delete user
             </Button>
           </DialogFooter>
         </DialogContent>
