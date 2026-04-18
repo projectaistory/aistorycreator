@@ -8,8 +8,17 @@ export async function GET(request: NextRequest) {
   if (authErr) return authErr;
 
   const cfg = await getStripeConfig();
+  const hasSecretKey = !!cfg.secretKey;
+  const hasPublishableKey = !!cfg.publishableKey;
+  const hasWebhookSecret = !!cfg.webhookSecret;
+  const ready = cfg.enabled && hasSecretKey && hasPublishableKey;
+
   return Response.json({
     enabled: cfg.enabled,
     publishableKey: cfg.publishableKey,
+    hasSecretKey,
+    hasPublishableKey,
+    hasWebhookSecret,
+    ready,
   });
 }

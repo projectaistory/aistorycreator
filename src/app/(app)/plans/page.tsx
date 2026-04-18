@@ -10,7 +10,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { Check, CreditCard, ExternalLink, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, CreditCard, ExternalLink, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 function errMessage(err: unknown, fallback: string) {
@@ -34,10 +34,27 @@ export default function PlansPage() {
   });
   const { data: billingConfig } = useQuery({
     queryKey: ["billing-config"],
-    queryFn: () => apiRequest<{ enabled: boolean; publishableKey: string }>("/api/billing/config"),
+    queryFn: () =>
+      apiRequest<{
+        enabled: boolean;
+        publishableKey: string;
+        hasSecretKey: boolean;
+        hasPublishableKey: boolean;
+        hasWebhookSecret: boolean;
+        ready: boolean;
+      }>("/api/billing/config"),
   });
 
   const billingEnabled = !!billingConfig?.enabled;
+  const billingReady = !!billingConfig?.ready;
+  const isAdmin = user?.role === "ADMIN";
+  const billingIssue = (() => {
+    if (!billingConfig) return null;
+    if (!billingConfig.enabled) return "disabled" as const;
+    if (!billingConfig.hasSecretKey) return "missing-secret-key" as const;
+    if (!billingConfig.hasPublishableKey) return "missing-publishable-key" as const;
+    return null;
+  })();
   const hasActiveSubscription =
     !!user?.stripeSubscriptionId &&
     !!user?.stripeSubscriptionStatus &&
@@ -59,6 +76,10 @@ export default function PlansPage() {
     if (user?.planId === plan.id) return;
     if (!billingEnabled) {
       toast.error("Billing is currently disabled");
+      return;
+    }
+    if (!billingReady) {
+      toast.error("Stripe is not fully configured yet. Check Admin → Settings → Stripe.");
       return;
     }
     const interval = annual ? "year" : "month";
@@ -112,6 +133,35 @@ export default function PlansPage() {
           available yet; new accounts use the free tier.
         </p>
       </div>
+
+      {billingIssue ? (
+        <div className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">
+              {billingIssue === "disabled"
+                ? "Stripe billing is currently disabled."
+                : billingIssue === "missing-secret-key"
+                  ? "Stripe secret key is missing."
+                  : "Stripe publishable key is missing."}
+            </p>
+            <p className="text-muted-foreground">
+              {isAdmin ? (
+                <>
+                  Paid plans can&apos;t be subscribed to until this is fixed.{" "}
+                  <a href="/admin/settings" className="font-medium text-primary underline">
+                    Open Admin → Settings → Stripe payments
+                  </a>{" "}
+                  and turn on <span className="font-medium">Accept payments with Stripe</span>,
+                  then save all required keys.
+                </>
+              ) : (
+                <>Subscriptions will be available once an administrator finishes setup.</>
+              )}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {hasActiveSubscription ? (
         <Card className="border-dashed">
@@ -202,7 +252,10 @@ export default function PlansPage() {
                   const currentPlan = plans.find((p) => p.id === user?.planId);
                   const selectedPriceId = annual ? plan.yearlyPriceId : plan.monthlyPriceId;
                   const canDowngrade = !!currentPlan && plan.monthlyPrice < currentPlan.monthlyPrice;
-                  const canCheckout = billingEnabled && (price === 0 || !!selectedPriceId);
+                  const canCheckout =
+                    price === 0
+                      ? true
+                      : billingReady && !!selectedPriceId;
                   const loading = planLoadingId === plan.id;
 
                   return (
@@ -257,11 +310,13 @@ export default function PlansPage() {
                             ? "Your current plan"
                             : !billingEnabled
                               ? "Stripe billing is currently disabled"
-                              : !selectedPriceId && price > 0
-                                ? "Stripe Price ID missing for this interval"
-                                : canDowngrade
-                                  ? "Switch to this lower-priced plan"
-                                  : "Continue to Stripe checkout"
+                              : !billingReady
+                                ? "Stripe is not fully configured"
+                                : !selectedPriceId && price > 0
+                                  ? "Stripe Price ID missing for this interval"
+                                  : canDowngrade
+                                    ? "Switch to this lower-priced plan"
+                                    : "Continue to Stripe checkout"
                         }
                       >
                         {loading
@@ -270,7 +325,7 @@ export default function PlansPage() {
                             ? "Active plan"
                             : price === 0
                               ? "Switch to free"
-                              : "Checkout"}
+                              : "Subscribe"}
                       </Button>
                     </div>
                   );
