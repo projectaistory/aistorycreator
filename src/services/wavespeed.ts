@@ -397,7 +397,7 @@ export async function generateSingleSceneImage(
 // ─── Video Segments (guide §6.5) ───
 
 export async function generateVideoSegment(
-  model: "infinitetalk" | "seedance",
+  model: "infinitetalk" | "seedance" | "wan-2.2" | "kling-v2.6-pro",
   imageUrl: string,
   prompt: string,
   audioUrl?: string,
@@ -412,7 +412,7 @@ export async function generateVideoSegment(
       prompt,
       seed: Math.floor(Math.random() * 999999),
     });
-  } else {
+  } else if (model === "seedance") {
     const duration = 6;
     data = await wavespeedPost(
       "/bytedance/seedance-v1.5-pro/image-to-video-fast",
@@ -424,6 +424,23 @@ export async function generateVideoSegment(
         generate_audio: false,
       }
     );
+  } else if (model === "wan-2.2") {
+    data = await wavespeedPost("/wavespeed-ai/wan-2.2/image-to-video", {
+      duration: 5,
+      image: imageUrl,
+      prompt,
+      resolution: "480p",
+      seed: -1,
+    });
+  } else {
+    data = await wavespeedPost("/kwaivgi/kling-v2.6-pro/image-to-video", {
+      cfg_scale: 0.5,
+      duration: 5,
+      image: imageUrl,
+      prompt,
+      sound: false,
+      voice_list: [],
+    });
   }
 
   const predictionId = getPredictionId(data);

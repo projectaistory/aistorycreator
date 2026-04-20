@@ -44,8 +44,10 @@ import {
   STORY_DURATION_MAX,
   STORY_MAX_CHARACTERS,
   STORY_DEFAULT_ASPECT_RATIO,
+  STORY_DEFAULT_VIDEO_MODEL,
   getStoryVideoGenerationCredits,
   normalizeStoryVideoAspectRatio,
+  normalizeStoryVideoModel,
 } from "@/lib/constants";
 import {
   FREE_PLAN_MAX_STORY_DURATION_SECONDS,
@@ -76,6 +78,7 @@ export default function CreateStoryPage() {
   const [narrator, setNarrator] = useState(true);
   const [narratorVoice, setNarratorVoice] = useState("Alex");
   const [aspectRatio, setAspectRatio] = useState(STORY_DEFAULT_ASPECT_RATIO);
+  const [videoModel, setVideoModel] = useState(STORY_DEFAULT_VIDEO_MODEL);
   const [characters, setCharacters] = useState<StoryCharacter[]>([]);
   const [showCharPicker, setShowCharPicker] = useState(false);
 
@@ -146,6 +149,7 @@ export default function CreateStoryPage() {
         setNarrator(p.storyNarrator);
         setNarratorVoice(p.storyNarratorVoice || "Alex");
         setAspectRatio(normalizeStoryVideoAspectRatio(p.aspectRatio));
+        setVideoModel(normalizeStoryVideoModel(p.videoQuality));
         const loadedChars = p.storyCharacters || [];
         const clampedChars = clampCharacters(loadedChars);
         if (loadedChars.length > clampedChars.length) {
@@ -208,6 +212,7 @@ export default function CreateStoryPage() {
             narratorVoice,
             characters,
             aspectRatio,
+            videoModel,
           }),
         }
       ),
@@ -457,6 +462,25 @@ export default function CreateStoryPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Video Model</Label>
+                <Select
+                  value={videoModel}
+                  onValueChange={(v) => v && setVideoModel(normalizeStoryVideoModel(v))}
+                >
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wan-2.2">Wan 2.2 (default)</SelectItem>
+                    <SelectItem value="seedance">Seedance 1.5</SelectItem>
+                    <SelectItem value="kling-v2.6-pro">
+                      Kling v2.6 Pro (premium)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">

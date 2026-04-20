@@ -4,9 +4,11 @@ import { getAuthUser, requireAuth } from "@/lib/auth";
 import { generateStoryScript } from "@/services/openai";
 import type { Prisma } from "@prisma/client";
 import {
+  STORY_DEFAULT_VIDEO_MODEL,
   STORY_DURATION_MIN,
   STORY_MAX_CHARACTERS,
   normalizeStoryVideoAspectRatio,
+  normalizeStoryVideoModel,
 } from "@/lib/constants";
 import { maxStoryDurationSecondsForPlan } from "@/lib/planLimits";
 
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest) {
       narratorVoice,
       characters = [],
       aspectRatio: rawAspect,
+      videoModel: rawVideoModel,
     } = body;
 
     if (!storyPrompt) {
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
     );
 
     const aspectRatio = normalizeStoryVideoAspectRatio(rawAspect);
+    const videoModel = normalizeStoryVideoModel(rawVideoModel);
     if (characters.length > STORY_MAX_CHARACTERS) {
       return Response.json(
         {
@@ -66,6 +70,7 @@ export async function POST(request: NextRequest) {
         storyScript: script as unknown as Prisma.InputJsonValue,
         storyScenePrompts: script.map((s) => s.scene_description) as unknown as Prisma.InputJsonValue,
         aspectRatio,
+        videoQuality: videoModel || STORY_DEFAULT_VIDEO_MODEL,
         currentStep: 2,
       },
     });

@@ -3,6 +3,8 @@ export const STORY_DURATION_MAX = 300;
 export const STORY_MAX_CHARACTERS = 3;
 export const STORY_DEFAULT_ASPECT_RATIO: "16:9" | "9:16" = "9:16";
 export const STORY_DEFAULT_NARRATOR_VOICE = "Alex";
+export type StoryVideoModel = "seedance" | "wan-2.2" | "kling-v2.6-pro";
+export const STORY_DEFAULT_VIDEO_MODEL: StoryVideoModel = "wan-2.2";
 export const STORY_VIDEO_CREDITS_PER_30_SECONDS = 2000;
 
 /** Story video output: `16:9` landscape or `9:16` portrait. Legacy `3:4` normalizes to `9:16`. */
@@ -10,6 +12,20 @@ export function normalizeStoryVideoAspectRatio(
   aspect: string | null | undefined
 ): "16:9" | "9:16" {
   return aspect === "16:9" ? "16:9" : "9:16";
+}
+
+/**
+ * Story video model selector.
+ * Legacy `videoQuality=quick` rows map to Seedance.
+ */
+export function normalizeStoryVideoModel(
+  value: string | null | undefined
+): StoryVideoModel {
+  if (value === "seedance") return "seedance";
+  if (value === "wan-2.2") return "wan-2.2";
+  if (value === "kling-v2.6-pro") return "kling-v2.6-pro";
+  if (value === "quick") return "seedance";
+  return STORY_DEFAULT_VIDEO_MODEL;
 }
 
 export const STORY_VOICE_CDN_BASE =

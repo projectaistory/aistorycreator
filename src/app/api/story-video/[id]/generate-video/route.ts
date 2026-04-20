@@ -17,7 +17,10 @@ import { ensureUrlOnBunnyStorage } from "@/services/bunnyStorage";
 import { nanoid } from "nanoid";
 import type { StoryScene } from "@/types";
 import { isNarratorCharacter } from "@/lib/storyTtsVoices";
-import { normalizeStoryVideoAspectRatio } from "@/lib/constants";
+import {
+  normalizeStoryVideoAspectRatio,
+  normalizeStoryVideoModel,
+} from "@/lib/constants";
 
 const DEBUG_MSG_MAX = 4000;
 
@@ -94,6 +97,7 @@ export async function POST(
       const storyAspect = normalizeStoryVideoAspectRatio(
         projectSnapshot.aspectRatio
       );
+      const storyVideoModel = normalizeStoryVideoModel(projectSnapshot.videoQuality);
       const script = projectSnapshot.storyScript as unknown as StoryScene[];
       const scenePrompts = projectSnapshot.storyScenePrompts as unknown as string[];
       const dimensions = getDimensions(storyAspect);
@@ -107,7 +111,7 @@ export async function POST(
       });
 
       await videoTrace(
-        "Phase: parallel per-scene video (WaveSpeed Seedance / InfiniteTalk + optional ffmpeg narrator mux)"
+        `Phase: parallel per-scene video (WaveSpeed ${storyVideoModel} / InfiniteTalk + optional ffmpeg narrator mux)`
       );
 
       // §5.5.4 — parallel segment generation
@@ -118,7 +122,7 @@ export async function POST(
           const scenePrompt = scenePrompts?.[i] || scene?.scene_description || "animated scene";
 
           await videoTrace(
-            `Scene ${i + 1}/${sceneImages.length} START speaker=${scene?.character ?? "?"} model=${isNarratorCharacter(scene?.character) ? "seedance+mux" : "infinitetalk"} image=${summarizeMediaUrl(sceneImage)}`
+            `Scene ${i + 1}/${sceneImages.length} START speaker=${scene?.character ?? "?"} model=${isNarratorCharacter(scene?.character) ? `${storyVideoModel}+mux` : "infinitetalk"} image=${summarizeMediaUrl(sceneImage)}`
           );
 
           await prisma.generationLog.create({
@@ -134,17 +138,17 @@ export async function POST(
 
           if (isNarratorCharacter(scene?.character)) {
             await videoTrace(
-              `Scene ${i + 1}: calling WaveSpeed Seedance (silent)…`
+              `Scene ${i + 1}: calling WaveSpeed ${storyVideoModel} (silent)…`
             );
             const silentUrl = await generateVideoSegment(
-              "seedance",
+              storyVideoModel,
               sceneImage,
               scenePrompt,
               undefined,
               storyAspect
             );
             await videoTrace(
-              `Scene ${i + 1}: Seedance OK → ${summarizeMediaUrl(silentUrl)}`
+              `Scene ${i + 1}: ${storyVideoModel} OK → ${summarizeMediaUrl(silentUrl)}`
             );
 
             if (sceneAudio) {
