@@ -14,21 +14,6 @@
 
 import { summarizeMediaUrl } from "@/lib/pipelineTrace";
 
-const FFMPEG_API_BASE =
-  process.env.FFMPEG_API_BASE?.replace(/\/$/, "") ||
-  "https://ffmpegapi-production.up.railway.app";
-
-const FFMPEG_MERGE_VIDEOS_URL =
-  process.env.FFMPEG_MERGE_VIDEOS_URL || `${FFMPEG_API_BASE}/api/merge_videos`;
-
-const FFMPEG_NEONVIDEO_MERGE_URL =
-  process.env.FFMPEG_NEONVIDEO_MERGE_URL ||
-  `${FFMPEG_API_BASE}/api/neonvideo_merge_videos`;
-
-const FFMPEG_CAPTIONS_URL =
-  process.env.FFMPEG_CAPTIONS_URL ||
-  `${FFMPEG_API_BASE}/api/videos/add-tiktok-captions`;
-
 const FFMPEG_POST_RETRIES = 3;
 const FFMPEG_RETRY_DELAY_MS = 4000;
 
@@ -37,6 +22,22 @@ export type FfmpegTraceFn = (line: string) => void | Promise<void>;
 
 /** Re-host www.ffmpegapi.net outputs before the next neonvideo_merge (required for round 2+). */
 export type NeonvideoMergeMirrorFn = (url: string) => Promise<string>;
+
+function getFfmpegApiBase(): string {
+  const base = process.env.FFMPEG_API_BASE?.trim().replace(/\/$/, "");
+  if (!base) {
+    throw new Error(
+      "FFMPEG_API_BASE is missing or empty. Set it in the environment so ffmpeg endpoints resolve from this base URL."
+    );
+  }
+  return base;
+}
+
+function getFfmpegEndpoint(
+  path: "/api/merge_videos" | "/api/neonvideo_merge_videos" | "/api/videos/add-tiktok-captions"
+): string {
+  return `${getFfmpegApiBase()}${path}`;
+}
 
 function getApiKey() {
   const key = process.env.FFMPEG_API_KEY?.trim();
@@ -127,7 +128,8 @@ async function ffmpegPost(
   operation: string,
   trace?: FfmpegTraceFn
 ): Promise<Record<string, unknown>> {
-  const endpointPath = url.replace(FFMPEG_API_BASE, "") || url;
+  const apiBase = getFfmpegApiBase();
+  const endpointPath = url.replace(apiBase, "") || url;
 
   let lastText = "";
   let lastStatus = 0;
@@ -204,7 +206,7 @@ export async function mergeVideoWithAudio(
   await trace?.(`${op} silent=${summarizeMediaUrl(silentVideoUrl)}`);
 
   const data = await ffmpegPost(
-    FFMPEG_MERGE_VIDEOS_URL,
+    getFfmpegEndpoint("/api/merge_videos"),
     {
       video_urls: [silentVideoUrl],
       audio_url: audioUrl,
@@ -233,7 +235,7 @@ async function neonvideoConcatPair(
   mirror?: NeonvideoMergeMirrorFn
 ): Promise<string> {
   const data = await ffmpegPost(
-    FFMPEG_NEONVIDEO_MERGE_URL,
+    getFfmpegEndpoint("/api/neonvideo_merge_videos"),
     {
       video_urls: [a, b],
       audio_url: "",
@@ -290,7 +292,7 @@ async function mergeFinalTimeline(
   if (watermarkUrl) body.watermark_url = watermarkUrl;
 
   const data = await ffmpegPost(
-    FFMPEG_NEONVIDEO_MERGE_URL,
+    getFfmpegEndpoint("/api/neonvideo_merge_videos"),
     body,
     operation,
     trace
@@ -391,7 +393,7 @@ export async function addTikTokCaptions(
   const mappedStyle = subtitleStyle === "classic" ? "yellow-bg" : subtitleStyle;
 
   const data = await ffmpegPost(
-    FFMPEG_CAPTIONS_URL,
+    getFfmpegEndpoint("/api/videos/add-tiktok-captions"),
     {
       video_url: videoUrl,
       subtitle_style: mappedStyle,
