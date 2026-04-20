@@ -427,7 +427,8 @@ export async function generateVideoSegment(
   }
 
   const predictionId = getPredictionId(data);
-  const result = await wavespeedPoll(predictionId, 10000, 60);
+  // Video generation can run well past 10 minutes under provider load.
+  const result = await wavespeedPoll(predictionId, 10000, 120);
   const videoUrl = extractVideoUrl(result);
   if (!videoUrl) throw new Error(`No video URL from ${model}`);
   return videoUrl;
